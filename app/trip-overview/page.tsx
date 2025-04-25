@@ -250,6 +250,7 @@ export default function TripOverview() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [trip, setTrip] = useState(tripsData[tripId as keyof typeof tripsData]);
 
   // Add these new state variables for the map
@@ -264,17 +265,6 @@ export default function TripOverview() {
     id: "google-map-script",
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
   });
-
-  //   useEffect(() => {
-  //     // Update trip data when tripId changes
-  //     if (tripsData[tripId as keyof typeof tripsData]) {
-  //       setTrip(tripsData[tripId as keyof typeof tripsData]);
-  //       setSelectedDay(tripsData[tripId as keyof typeof tripsData].days[0].id);
-  //     } else {
-  //       // If trip not found, redirect to dashboard
-  //       router.push("/");
-  //     }
-  //   }, [tripId, router]);
 
   // Update map center based on trip location
   useEffect(() => {
@@ -408,26 +398,53 @@ export default function TripOverview() {
   const handleCategorySelect = (category: string) => {
     if (selectedCategory === category) {
       setSelectedCategory(""); // Toggle off if already selected
+      setSearchQuery(""); // Clear search query
+      setIsAddingActivity(false);
     } else {
       setSelectedCategory(category);
+      setSearchQuery(""); // Clear search query
+      setIsAddingActivity(false); // Exit add activity mode
     }
   };
 
+  // Handle adding an activity
+  const handleAddActivity = () => {
+    setIsAddingActivity(true);
+    setSelectedCategory(""); // Clear selected category
+    setSearchQuery(""); // Clear search query
+  };
+
+  // Close middle panel
+  const closeMiddlePanel = () => {
+    setSelectedCategory("");
+    setIsAddingActivity(false);
+    setSearchQuery("");
+  };
+
   // Get category display name
-  const getCategoryDisplayName = () => {
-    switch (selectedCategory) {
-      case "restaurants":
-        return "Restaurants";
-      case "activities":
-        return "Things to do";
-      case "hotels":
-        return "Hotels";
-      case "museums":
-        return "Museums";
-      default:
-        return "Search on map...";
+  const getSearchPlaceholder = () => {
+    if (isAddingActivity) {
+      return "Search location";
+    } else if (selectedCategory) {
+      switch (selectedCategory) {
+        case "restaurants":
+          return "Restaurants";
+        case "activities":
+          return "Things to do";
+        case "hotels":
+          return "Hotels";
+        case "museums":
+          return "Museums";
+        default:
+          return "Search on map...";
+      }
+    } else {
+      return "Search on map...";
     }
   };
+
+  // Check if middle panel should be shown
+  const showMiddlePanel = selectedCategory || isAddingActivity;
 
   if (!trip) return null;
 
@@ -549,7 +566,7 @@ export default function TripOverview() {
           <div
             className={`${
               selectedCategory ? "w-1/4" : "w-1/4"
-            } border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300`}
+            } border-r border-gray-200 dark:border-gray-700 flex flex-col `}
           >
             <div className="border-b border-gray-200 dark:border-gray-700 p-4">
               <h2 className="text-xl font-bold">Trip Overview</h2>
@@ -624,6 +641,7 @@ export default function TripOverview() {
                   <Button
                     variant="outline"
                     className="w-full border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+                    onClick={handleAddActivity}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Activity
@@ -634,37 +652,32 @@ export default function TripOverview() {
           </div>
 
           {/* Middle Panel - Category Content (Only shown when a category is selected) */}
-          {selectedCategory && (
-            <div className="w-1/4 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300">
+          {showMiddlePanel && (
+            <div className="w-[580px] border-r border-gray-200 dark:border-gray-700 flex flex-col">
               <div className="border-b border-gray-200 dark:border-gray-700 p-4">
                 {/* Search Bar */}
-                <div className="w-full rounded-full bg-white shadow-lg mb-4">
+                <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
                   <div className="flex items-center p-2">
                     <Search className="ml-2 h-5 w-5 text-gray-500" />
                     <Input
-                      placeholder={getCategoryDisplayName()}
+                      placeholder={getSearchPlaceholder()}
                       className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
-                    {selectedCategory && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-500"
-                        onClick={() => {
-                          setSelectedCategory("");
-                          setSearchQuery("");
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-500"
+                      onClick={closeMiddlePanel}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
 
                 {/* Category Buttons */}
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex flex-wrap gap-1 mb-4">
                   <Button
                     variant={
                       selectedCategory === "restaurants"
@@ -730,10 +743,14 @@ export default function TripOverview() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold capitalize">
-                      Results
+                      {isAddingActivity ? "Recent Searches" : "Results"}
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {getCurrentCategoryData().length} options available
+                      {isAddingActivity
+                        ? "Search for a location to add"
+                        : `${
+                            getCurrentCategoryData().length
+                          } options available`}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -799,55 +816,70 @@ export default function TripOverview() {
               </div>
               <ScrollArea className="flex-1">
                 <div className="grid gap-4 p-4">
-                  {getCurrentCategoryData().map((item) => (
-                    <Card
-                      key={item.id}
-                      className="overflow-hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
-                    >
-                      <div className="flex">
-                        <img
-                          src={item.image || "/placeholder.svg"}
-                          alt={item.title}
-                          className="h-[100px] w-[100px] object-cover"
-                        />
-                        <div className="flex flex-1 flex-col p-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold">{item.title}</h4>
-                            <Badge
-                              variant="outline"
-                              className="border-gray-200 dark:border-gray-700"
-                            >
-                              {item.category}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                            {item.description}
-                          </p>
-                          <div className="mt-auto flex items-center justify-between">
-                            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                              <MapPin className="mr-1 h-3 w-3" />
-                              {item.location}
-                            </div>
-                            <div className="flex items-center">
-                              <span className="text-xs font-medium mr-2">
-                                ★ {item.rating}
-                              </span>
-                              <span className="text-xs font-medium">
-                                {item.price}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 ml-2 text-black dark:text-white"
+                  {isAddingActivity ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="mb-4 rounded-full bg-muted/50 p-3">
+                        <Search className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                      </div>
+                      <h3 className="mb-1 text-lg font-medium">
+                        Search for a location
+                      </h3>
+                      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                        Type in the search bar above to find places to add to
+                        your itinerary
+                      </p>
+                    </div>
+                  ) : (
+                    getCurrentCategoryData().map((item) => (
+                      <Card
+                        key={item.id}
+                        className="overflow-hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
+                      >
+                        <div className="flex">
+                          <img
+                            src={item.image || "/placeholder.svg"}
+                            alt={item.title}
+                            className="h-[100px] w-[100px] object-cover"
+                          />
+                          <div className="flex flex-1 flex-col p-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold">{item.title}</h4>
+                              <Badge
+                                variant="outline"
+                                className="border-gray-200 dark:border-gray-700"
                               >
-                                <Plus className="h-4 w-4" />
-                              </Button>
+                                {item.category}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                              {item.description}
+                            </p>
+                            <div className="mt-auto flex items-center justify-between">
+                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                                <MapPin className="mr-1 h-3 w-3" />
+                                {item.location}
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-xs font-medium mr-2">
+                                  ★ {item.rating}
+                                </span>
+                                <span className="text-xs font-medium">
+                                  {item.price}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 ml-2 text-black dark:text-white"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    ))
+                  )}
                 </div>
               </ScrollArea>
             </div>
@@ -855,9 +887,7 @@ export default function TripOverview() {
 
           {/* Right Panel - Map View with Search and Category Buttons */}
           <div
-            className={`${
-              selectedCategory ? "w-2/4" : "w-3/4"
-            } flex flex-col transition-all duration-300`}
+            className={`${showMiddlePanel ? "flex-1" : "w-3/4"} flex flex-col`}
           >
             <div className="relative flex-1">
               {/* Map Container */}
@@ -945,14 +975,14 @@ export default function TripOverview() {
               </div>
 
               {/* Search and Category Controls - Floating above the map */}
-              {!selectedCategory && (
+              {!showMiddlePanel && (
                 <div className="absolute left-4 top-4 z-10 flex flex-col gap-2">
                   {/* Search Bar - Width matches the total width of all buttons */}
                   <div className="w-[550px] rounded-full bg-white shadow-lg">
                     <div className="flex items-center p-2">
                       <Search className="ml-2 h-5 w-5 text-gray-500" />
                       <Input
-                        placeholder="Search on map..."
+                        placeholder={getSearchPlaceholder()}
                         className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
