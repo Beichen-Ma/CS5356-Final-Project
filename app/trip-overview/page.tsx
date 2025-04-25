@@ -15,6 +15,7 @@ import {
   Utensils,
   Landmark,
   Hotel,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   GoogleMap,
   useJsApiLoader,
@@ -45,12 +47,23 @@ const tripsData = {
     startDate: "May 1, 2023",
     endDate: "May 5, 2023",
     location: "NYC",
+    collaborators: [
+      { id: "1", name: "Alex", color: "bg-green-500" },
+      { id: "2", name: "Sam", color: "bg-blue-500" },
+      { id: "3", name: "Taylor", color: "bg-purple-500" },
+      { id: "4", name: "Jordan", color: "bg-yellow-500" },
+      { id: "5", name: "Casey", color: "bg-pink-500" },
+      { id: "6", name: "Riley", color: "bg-indigo-500" },
+      { id: "7", name: "Morgan", color: "bg-red-500" },
+      { id: "8", name: "Jamie", color: "bg-orange-500" },
+      { id: "9", name: "Quinn", color: "bg-teal-500" },
+    ],
     days: [
-      { id: "day1", date: "May 1", title: "Day 1" },
-      { id: "day2", date: "May 2", title: "Day 2" },
-      { id: "day3", date: "May 3", title: "Day 3" },
-      { id: "day4", date: "May 4", title: "Day 4" },
-      { id: "day5", date: "May 5", title: "Day 5" },
+      { id: "day1", date: "May 1", title: "Day 1", number: "1" },
+      { id: "day2", date: "May 2", title: "Day 2", number: "2" },
+      { id: "day3", date: "May 3", title: "Day 3", number: "3" },
+      { id: "day4", date: "May 4", title: "Day 4", number: "4" },
+      { id: "day5", date: "May 5", title: "Day 5", number: "5" },
     ],
     activities: {
       day1: [
@@ -104,14 +117,20 @@ const tripsData = {
     startDate: "June 15, 2023",
     endDate: "June 21, 2023",
     location: "California",
+    collaborators: [
+      { id: "2", name: "Sam", color: "bg-blue-500" },
+      { id: "3", name: "Taylor", color: "bg-purple-500" },
+      { id: "5", name: "Casey", color: "bg-pink-500" },
+      { id: "7", name: "Morgan", color: "bg-red-500" },
+    ],
     days: [
-      { id: "day1", date: "June 15", title: "Day 1" },
-      { id: "day2", date: "June 16", title: "Day 2" },
-      { id: "day3", date: "June 17", title: "Day 3" },
-      { id: "day4", date: "June 18", title: "Day 4" },
-      { id: "day5", date: "June 19", title: "Day 5" },
-      { id: "day6", date: "June 20", title: "Day 6" },
-      { id: "day7", date: "June 21", title: "Day 7" },
+      { id: "day1", date: "June 15", title: "Day 1", number: "1" },
+      { id: "day2", date: "June 16", title: "Day 2", number: "2" },
+      { id: "day3", date: "June 17", title: "Day 3", number: "3" },
+      { id: "day4", date: "June 18", title: "Day 4", number: "4" },
+      { id: "day5", date: "June 19", title: "Day 5", number: "5" },
+      { id: "day6", date: "June 20", title: "Day 6", number: "6" },
+      { id: "day7", date: "June 21", title: "Day 7", number: "7" },
     ],
     activities: {
       day1: [
@@ -138,15 +157,20 @@ const tripsData = {
     startDate: "August 10, 2023",
     endDate: "August 17, 2023",
     location: "Paris",
+    collaborators: [
+      { id: "1", name: "Alex", color: "bg-green-500" },
+      { id: "4", name: "Jordan", color: "bg-yellow-500" },
+      { id: "5", name: "Casey", color: "bg-pink-500" },
+    ],
     days: [
-      { id: "day1", date: "August 10", title: "Day 1" },
-      { id: "day2", date: "August 11", title: "Day 2" },
-      { id: "day3", date: "August 12", title: "Day 3" },
-      { id: "day4", date: "August 13", title: "Day 4" },
-      { id: "day5", date: "August 14", title: "Day 5" },
-      { id: "day6", date: "August 15", title: "Day 6" },
-      { id: "day7", date: "August 16", title: "Day 7" },
-      { id: "day8", date: "August 17", title: "Day 8" },
+      { id: "day1", date: "August 10", title: "Day 1", number: "1" },
+      { id: "day2", date: "August 11", title: "Day 2", number: "2" },
+      { id: "day3", date: "August 12", title: "Day 3", number: "3" },
+      { id: "day4", date: "August 13", title: "Day 4", number: "4" },
+      { id: "day5", date: "August 14", title: "Day 5", number: "5" },
+      { id: "day6", date: "August 15", title: "Day 6", number: "6" },
+      { id: "day7", date: "August 16", title: "Day 7", number: "7" },
+      { id: "day8", date: "August 17", title: "Day 8", number: "8" },
     ],
     activities: {
       day1: [
@@ -174,18 +198,23 @@ const tripsData = {
     startDate: "October 5, 2023",
     endDate: "October 15, 2023",
     location: "Tokyo",
+    collaborators: [
+      { id: "1", name: "Alex", color: "bg-green-500" },
+      { id: "3", name: "Taylor", color: "bg-purple-500" },
+      { id: "6", name: "Riley", color: "bg-indigo-500" },
+    ],
     days: [
-      { id: "day1", date: "October 5", title: "Day 1" },
-      { id: "day2", date: "October 6", title: "Day 2" },
-      { id: "day3", date: "October 7", title: "Day 3" },
-      { id: "day4", date: "October 8", title: "Day 4" },
-      { id: "day5", date: "October 9", title: "Day 5" },
-      { id: "day6", date: "October 10", title: "Day 6" },
-      { id: "day7", date: "October 11", title: "Day 7" },
-      { id: "day8", date: "October 12", title: "Day 8" },
-      { id: "day9", date: "October 13", title: "Day 9" },
-      { id: "day10", date: "October 14", title: "Day 10" },
-      { id: "day11", date: "October 15", title: "Day 11" },
+      { id: "day1", date: "October 5", title: "Day 1", number: "1" },
+      { id: "day2", date: "October 6", title: "Day 2", number: "2" },
+      { id: "day3", date: "October 7", title: "Day 3", number: "3" },
+      { id: "day4", date: "October 8", title: "Day 4", number: "4" },
+      { id: "day5", date: "October 9", title: "Day 5", number: "5" },
+      { id: "day6", date: "October 10", title: "Day 6", number: "6" },
+      { id: "day7", date: "October 11", title: "Day 7", number: "7" },
+      { id: "day8", date: "October 12", title: "Day 8", number: "8" },
+      { id: "day9", date: "October 13", title: "Day 9", number: "9" },
+      { id: "day10", date: "October 14", title: "Day 10", number: "10" },
+      { id: "day11", date: "October 15", title: "Day 11", number: "11" },
     ],
     activities: {
       day1: [
@@ -384,6 +413,22 @@ export default function TripOverview() {
     }
   };
 
+  // Get category display name
+  const getCategoryDisplayName = () => {
+    switch (selectedCategory) {
+      case "restaurants":
+        return "Restaurants";
+      case "activities":
+        return "Things to do";
+      case "hotels":
+        return "Hotels";
+      case "museums":
+        return "Museums";
+      default:
+        return "Search on map...";
+    }
+  };
+
   if (!trip) return null;
 
   return (
@@ -409,6 +454,26 @@ export default function TripOverview() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {/* Collaborator Avatars */}
+            <div className="flex -space-x-2 mr-2">
+              {trip.collaborators?.slice(0, 5).map((collaborator) => (
+                <Avatar
+                  key={collaborator.id}
+                  className={`h-8 w-8 border-2 border-white dark:border-black ${collaborator.color}`}
+                >
+                  <AvatarFallback className="text-xs">
+                    {collaborator.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+              {trip.collaborators && trip.collaborators.length > 5 && (
+                <Avatar className="h-8 w-8 border-2 border-white dark:border-black bg-gray-200 dark:bg-gray-700">
+                  <AvatarFallback className="text-xs">
+                    +{trip.collaborators.length - 5}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+            </div>
             <Button
               variant="outline"
               className="border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
@@ -461,7 +526,7 @@ export default function TripOverview() {
                       isCollapsed ? "text-xs" : "text-sm"
                     }`}
                   >
-                    {isCollapsed ? day.title.charAt(0) : day.title}
+                    {isCollapsed ? day.number : day.title}
                   </span>
                 </Button>
               ))}
@@ -483,7 +548,7 @@ export default function TripOverview() {
           {/* First Panel - Day Overview */}
           <div
             className={`${
-              selectedCategory ? "w-1/3" : "w-1/2"
+              selectedCategory ? "w-1/4" : "w-1/4"
             } border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300`}
           >
             <div className="border-b border-gray-200 dark:border-gray-700 p-4">
@@ -570,14 +635,152 @@ export default function TripOverview() {
 
           {/* Middle Panel - Category Content (Only shown when a category is selected) */}
           {selectedCategory && (
-            <div className="w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300">
+            <div className="w-1/4 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300">
               <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-                <h2 className="text-lg font-semibold capitalize">
-                  {selectedCategory}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {getCurrentCategoryData().length} options available
-                </p>
+                {/* Search Bar */}
+                <div className="w-full rounded-full bg-white shadow-lg mb-4">
+                  <div className="flex items-center p-2">
+                    <Search className="ml-2 h-5 w-5 text-gray-500" />
+                    <Input
+                      placeholder={getCategoryDisplayName()}
+                      className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {selectedCategory && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-500"
+                        onClick={() => {
+                          setSelectedCategory("");
+                          setSearchQuery("");
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Buttons */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <Button
+                    variant={
+                      selectedCategory === "restaurants"
+                        ? "default"
+                        : "secondary"
+                    }
+                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                    onClick={() => handleCategorySelect("restaurants")}
+                  >
+                    <Utensils className="mr-2 h-4 w-4" />
+                    Restaurants
+                  </Button>
+                  <Button
+                    variant={
+                      selectedCategory === "hotels" ? "default" : "secondary"
+                    }
+                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                    onClick={() => handleCategorySelect("hotels")}
+                  >
+                    <Hotel className="mr-2 h-4 w-4" />
+                    Hotels
+                  </Button>
+                  <Button
+                    variant={
+                      selectedCategory === "activities"
+                        ? "default"
+                        : "secondary"
+                    }
+                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                    onClick={() => handleCategorySelect("activities")}
+                  >
+                    <Landmark className="mr-2 h-4 w-4" />
+                    Things to do
+                  </Button>
+                  <Button
+                    variant={
+                      selectedCategory === "museums" ? "default" : "secondary"
+                    }
+                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                    onClick={() => handleCategorySelect("museums")}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-2 h-4 w-4"
+                    >
+                      <path d="M2 20h20" />
+                      <path d="M5 4v16" />
+                      <path d="M19 4v16" />
+                      <path d="M5 4h14" />
+                      <path d="M5 12h14" />
+                    </svg>
+                    Museums
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold capitalize">
+                      Results
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {getCurrentCategoryData().length} options available
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-black hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white"
+                    >
+                      Sort by
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="ml-1 h-4 w-4"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:shadow-md transition-shadow dark:text-blue-400"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                        <polyline points="16 6 12 2 8 6" />
+                        <line x1="12" y1="2" x2="12" y2="15" />
+                      </svg>
+                      Share
+                    </Button>
+                  </div>
+                </div>
               </div>
               <div className="border-b border-gray-200 dark:border-gray-700">
                 <Tabs defaultValue="all">
@@ -653,7 +856,7 @@ export default function TripOverview() {
           {/* Right Panel - Map View with Search and Category Buttons */}
           <div
             className={`${
-              selectedCategory ? "w-1/3" : "w-1/2"
+              selectedCategory ? "w-2/4" : "w-3/4"
             } flex flex-col transition-all duration-300`}
           >
             <div className="relative flex-1">
@@ -742,78 +945,99 @@ export default function TripOverview() {
               </div>
 
               {/* Search and Category Controls - Floating above the map */}
-              <div className="absolute left-1/2 top-4 z-10 w-[90%] max-w-3xl -translate-x-1/2 rounded-full bg-white shadow-lg">
-                <div className="flex items-center p-2">
-                  <Search className="ml-2 h-5 w-5 text-gray-500" />
-                  <Input
-                    placeholder="Search on map..."
-                    className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
+              {!selectedCategory && (
+                <div className="absolute left-4 top-4 z-10 flex flex-col gap-2">
+                  {/* Search Bar - Width matches the total width of all buttons */}
+                  <div className="w-[550px] rounded-full bg-white shadow-lg">
+                    <div className="flex items-center p-2">
+                      <Search className="ml-2 h-5 w-5 text-gray-500" />
+                      <Input
+                        placeholder="Search on map..."
+                        className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                      {selectedCategory && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-500"
+                          onClick={() => {
+                            setSelectedCategory("");
+                            setSearchQuery("");
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
 
-              {/* Category Buttons */}
-              <div className="absolute left-1/2 top-20 z-10 flex -translate-x-1/2 gap-2 overflow-x-auto">
-                <Button
-                  variant={
-                    selectedCategory === "restaurants" ? "default" : "secondary"
-                  }
-                  className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                  onClick={() => handleCategorySelect("restaurants")}
-                >
-                  <Utensils className="mr-2 h-4 w-4" />
-                  Restaurants
-                </Button>
-                <Button
-                  variant={
-                    selectedCategory === "hotels" ? "default" : "secondary"
-                  }
-                  className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                  onClick={() => handleCategorySelect("hotels")}
-                >
-                  <Hotel className="mr-2 h-4 w-4" />
-                  Hotels
-                </Button>
-                <Button
-                  variant={
-                    selectedCategory === "activities" ? "default" : "secondary"
-                  }
-                  className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                  onClick={() => handleCategorySelect("activities")}
-                >
-                  <Landmark className="mr-2 h-4 w-4" />
-                  Things to do
-                </Button>
-                <Button
-                  variant={
-                    selectedCategory === "museums" ? "default" : "secondary"
-                  }
-                  className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                  onClick={() => handleCategorySelect("museums")}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mr-2 h-4 w-4"
-                  >
-                    <path d="M2 20h20" />
-                    <path d="M5 4v16" />
-                    <path d="M19 4v16" />
-                    <path d="M5 4h14" />
-                    <path d="M5 12h14" />
-                  </svg>
-                  Museums
-                </Button>
-              </div>
+                  {/* Category Buttons */}
+                  {/* <div className="absolute left-4 top-20 z-10 flex gap-2 overflow-x-auto"> */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant={
+                        selectedCategory === "restaurants"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("restaurants")}
+                    >
+                      <Utensils className="mr-2 h-4 w-4" />
+                      Restaurants
+                    </Button>
+                    <Button
+                      variant={
+                        selectedCategory === "hotels" ? "default" : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("hotels")}
+                    >
+                      <Hotel className="mr-2 h-4 w-4" />
+                      Hotels
+                    </Button>
+                    <Button
+                      variant={
+                        selectedCategory === "activities"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("activities")}
+                    >
+                      <Landmark className="mr-2 h-4 w-4" />
+                      Things to do
+                    </Button>
+                    <Button
+                      variant={
+                        selectedCategory === "museums" ? "default" : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("museums")}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mr-2 h-4 w-4"
+                      >
+                        <path d="M2 20h20" />
+                        <path d="M5 4v16" />
+                        <path d="M19 4v16" />
+                        <path d="M5 4h14" />
+                        <path d="M5 12h14" />
+                      </svg>
+                      Museums
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Map Markers - Show either day activities or selected category items */}
               <div className="absolute inset-0 pointer-events-none">
