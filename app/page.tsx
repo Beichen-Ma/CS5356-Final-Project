@@ -12,9 +12,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NewTripModal } from "@/components/new-trip-modal";
 import { cn } from "@/lib/utils";
+import { useTrips } from "@/context/trip-context";
 
 export default function Dashboard() {
   const router = useRouter();
+  const { trips } = useTrips();
   const [filter, setFilter] = useState("all");
   const [createdByMe, setCreatedByMe] = useState(false);
   const [newTripModalOpen, setNewTripModalOpen] = useState(false);
@@ -22,87 +24,26 @@ export default function Dashboard() {
   // Mock current user ID
   const currentUserId = "1"; // Alex
 
-  const trips = [
+  const tripsArray = [
     {
       id: "new",
       title: "New Trip",
       isNew: true,
     },
-    {
-      id: "nyc",
-      title: "NYC Trip",
-      startDate: "May 1, 2025",
-      endDate: "May 5, 2025",
-      days: 5,
-      createdBy: "1", // Alex
-      image: "/placeholder.svg?height=80&width=80",
-      collaborators: [
-        { id: "1", name: "Alex", color: "bg-green-500" },
-        { id: "2", name: "Sam", color: "bg-blue-500" },
-        { id: "3", name: "Taylor", color: "bg-purple-500" },
-        { id: "4", name: "Jordan", color: "bg-yellow-500" },
-        { id: "5", name: "Casey", color: "bg-pink-500" },
-        { id: "6", name: "Riley", color: "bg-indigo-500" },
-        { id: "7", name: "Morgan", color: "bg-red-500" },
-        { id: "8", name: "Jamie", color: "bg-orange-500" },
-        { id: "9", name: "Quinn", color: "bg-teal-500" },
-      ],
-    },
-    {
-      id: "cali",
-      title: "Cali Trip",
-      startDate: "June 15, 2023",
-      endDate: "June 21, 2023",
-      days: 7,
-      createdBy: "2", // Sam
-      image: "/placeholder.svg?height=80&width=80",
-      collaborators: [
-        { id: "2", name: "Sam", color: "bg-blue-500" },
-        { id: "3", name: "Taylor", color: "bg-purple-500" },
-        { id: "5", name: "Casey", color: "bg-pink-500" },
-        { id: "7", name: "Morgan", color: "bg-red-500" },
-        { id: "8", name: "Jamie", color: "bg-orange-500" },
-        { id: "9", name: "Quinn", color: "bg-teal-500" },
-      ],
-    },
-    {
-      id: "paris",
-      title: "Paris Trip",
-      startDate: "August 10, 2023",
-      endDate: "August 17, 2023",
-      days: 8,
-      createdBy: "1", // Alex
-      image: "/placeholder.svg?height=80&width=80",
-      collaborators: [
-        { id: "1", name: "Alex", color: "bg-green-500" },
-        { id: "4", name: "Jordan", color: "bg-yellow-500" },
-        { id: "5", name: "Casey", color: "bg-pink-500" },
-      ],
-    },
-    {
-      id: "tokyo",
-      title: "Tokyo Trip",
-      startDate: "October 5, 2023",
-      endDate: "October 15, 2023",
-      days: 11,
-      createdBy: "3", // Taylor
-      image: "/placeholder.svg?height=80&width=80",
-      collaborators: [
-        { id: "1", name: "Alex", color: "bg-green-500" },
-        { id: "3", name: "Taylor", color: "bg-purple-500" },
-        { id: "6", name: "Riley", color: "bg-indigo-500" },
-      ],
-    },
+    ...Object.values(trips),
   ];
 
   // Filter trips based on "Created by me" checkbox
-  const filteredTrips = trips.filter((trip) => {
-    if (trip.isNew) return true;
-    if (createdByMe) return trip.createdBy === currentUserId;
+  const filteredTrips = tripsArray.filter((trip) => {
+    if ("isNew" in trip) return true;
+    if (createdByMe)
+      return trip.collaborators.some(
+        (c) => c.id === currentUserId && c.id === "1"
+      ); // Assuming creator is first collaborator
 
     // Apply "Created by me" filter if selected
-    if (createdByMe && trip.createdBy !== currentUserId) return false;
-
+    if (createdByMe && !trip.collaborators.some((c) => c.id === currentUserId))
+      return false;
     // Apply date filters for Past/Ongoing
     if (filter !== "all") {
       // Parse the end date from the trip
@@ -284,12 +225,12 @@ export default function Dashboard() {
               key={trip.id}
               className={cn(
                 "border-gray-200 bg-white dark:border-gray-700 dark:bg-black hover:border-gray-300 dark:hover:border-gray-600",
-                !trip.isNew && "cursor-pointer"
+                !("isNew" in trip) && "cursor-pointer"
               )}
-              onClick={() => !trip.isNew && navigateToTrip(trip.id)}
+              onClick={() => !("isNew" in trip) && navigateToTrip(trip.id)}
             >
               <CardContent className="p-4">
-                {trip.isNew ? (
+                {"isNew" in trip ? (
                   <div
                     className="flex h-full flex-col items-center justify-center py-8 cursor-pointer"
                     onClick={() => setNewTripModalOpen(true)}
@@ -318,7 +259,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {trip.days} days
+                        {trip.days.length} days
                       </span>
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -344,7 +285,7 @@ export default function Dashboard() {
                         </span>
                       )}
                     </div>
-                    {trip.createdBy === currentUserId && (
+                    {trip.collaborators.some((c) => c.id === currentUserId) && (
                       <div className="text-xs text-gray-500 dark:text-gray-400 italic">
                         Created by you
                       </div>

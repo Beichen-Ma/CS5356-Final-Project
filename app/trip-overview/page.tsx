@@ -38,6 +38,7 @@ import {
   Marker,
   InfoWindow,
 } from "@react-google-maps/api";
+import { useTrips } from "@/context/trip-context";
 
 // Sample trip data
 const tripsData = {
@@ -245,13 +246,14 @@ export default function TripOverview() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tripId = searchParams.get("id") || "nyc";
+  const { getTrip } = useTrips();
 
   const [selectedDay, setSelectedDay] = useState("day1");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
-  const [trip, setTrip] = useState(tripsData[tripId as keyof typeof tripsData]);
+  const [trip, setTrip] = useState(getTrip(tripId));
 
   // Add these new state variables for the map
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.006 }); // Default to NYC coordinates
@@ -268,23 +270,28 @@ export default function TripOverview() {
 
   // Update map center based on trip location
   useEffect(() => {
+    const currentTrip = getTrip(tripId);
     // This would ideally be a geocoding call to get coordinates for trip.location
     // For simplicity, we're using hardcoded values for common locations
-    if (trip) {
-      const locationCoordinates: {
-        [key: string]: { lat: number; lng: number };
-      } = {
-        NYC: { lat: 40.7128, lng: -74.006 },
-        California: { lat: 36.7783, lng: -119.4179 },
-        Paris: { lat: 48.8566, lng: 2.3522 },
-        Tokyo: { lat: 35.6762, lng: 139.6503 },
-      };
+    if (currentTrip) {
+      setTrip(currentTrip);
+      setSelectedDay(currentTrip.days[0]?.id || "");
+      // const locationCoordinates: {
+      //   [key: string]: { lat: number; lng: number };
+      // } = {
+      //   NYC: { lat: 40.7128, lng: -74.006 },
+      //   California: { lat: 36.7783, lng: -119.4179 },
+      //   Paris: { lat: 48.8566, lng: 2.3522 },
+      //   Tokyo: { lat: 35.6762, lng: 139.6503 },
+      // };
 
-      setMapCenter(
-        locationCoordinates[trip.location] || { lat: 40.7128, lng: -74.006 }
-      );
+      // setMapCenter(
+      //   locationCoordinates[trip.location] || { lat: 40.7128, lng: -74.006 }
+      // );
+    } else {
+      router.push("/");
     }
-  }, [trip]);
+  }, [tripId, router, getTrip]);
 
   // Sample data for different categories
   const categoryData = {

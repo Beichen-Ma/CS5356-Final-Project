@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import { v4 as uuidv4 } from "uuid";
 import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
@@ -18,12 +20,13 @@ import { Label } from "@/components/ui/label";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { CollaboratorSelector } from "@/components/collaborator-selector";
 
-type Collaborator = {
-  id: string;
-  name: string;
-  email: string;
-  color: string;
-};
+// type Collaborator = {
+//   id: string;
+//   name: string;
+//   email: string;
+//   color: string;
+// };
+import { useTrips, type Collaborator, type Trip } from "@/context/trip-context";
 
 interface NewTripModalProps {
   open: boolean;
@@ -32,7 +35,9 @@ interface NewTripModalProps {
 
 export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
   const router = useRouter();
+  const { addTrip } = useTrips();
   const [tripName, setTripName] = React.useState("");
+  const [location, setLocation] = React.useState("");
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
   const [selectedCollaborators, setSelectedCollaborators] = React.useState<
     Collaborator[]
@@ -42,25 +47,73 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!tripName || !dateRange?.from || !dateRange?.to) {
+    if (!tripName || !dateRange?.from || !dateRange?.to || !location) {
       return;
     }
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      onOpenChange(false);
+    // Generate a unique ID for the new trip
+    const tripId = uuidv4();
 
-      // Reset form
-      setTripName("");
-      setDateRange(undefined);
-      setSelectedCollaborators([]);
+    // Format dates
+    const startDate = format(dateRange.from, "MMMM d, yyyy");
+    const endDate = format(dateRange.to, "MMMM d, yyyy");
 
-      // Redirect to trip overview page
-      router.push("/trip-overview");
-    }, 1000);
+    // Calculate number of days
+    const days =
+      Math.round(
+        (dateRange.to.getTime() - dateRange.from.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    // Create days array
+    const daysArray = Array.from({ length: days }, (_, i) => {
+      const date = new Date(dateRange.from!);
+      date.setDate(date.getDate() + i);
+      return {
+        id: `day${i + 1}`,
+        date: format(date, "MMM d"),
+        title: `Day ${i + 1}`,
+        number: `${i + 1}`,
+      };
+    });
+
+    // Create activities object
+    const activities = daysArray.reduce((acc, day) => {
+      acc[day.id] = [];
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Create new trip object
+    const newTrip: Trip = {
+      id: tripId,
+      title: tripName,
+      startDate,
+      endDate,
+      location,
+      collaborators: [
+        { id: "1", name: "Alex", color: "bg-green-500" }, // Current user
+        ...selectedCollaborators,
+      ],
+      days: daysArray,
+      activities,
+      image: "/placeholder.svg?height=80&width=80",
+    };
+
+    // Add the new trip to the context
+    addTrip(newTrip);
+
+    // Reset form and close modal
+    setTripName("");
+    setLocation("");
+    setDateRange(undefined);
+    setSelectedCollaborators([]);
+    setIsSubmitting(false);
+    onOpenChange(false);
+
+    // Navigate to the trip overview page
+    router.push(`/trip-overview?id=${tripId}`);
   };
 
   return (
@@ -86,6 +139,19 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
                 placeholder="Enter trip name"
                 value={tripName}
                 onChange={(e) => setTripName(e.target.value)}
+                className="border-gray-200 bg-transparent focus-visible:ring-gray-300 dark:border-gray-700 dark:focus-visible:ring-gray-600"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="location" className="text-sm">
+                Location
+              </Label>
+              <Input
+                id="location"
+                placeholder="Enter location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
                 className="border-gray-200 bg-transparent focus-visible:ring-gray-300 dark:border-gray-700 dark:focus-visible:ring-gray-600"
                 required
               />
@@ -119,7 +185,11 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
             <Button
               type="submit"
               disabled={
-                !tripName || !dateRange?.from || !dateRange?.to || isSubmitting
+                !tripName ||
+                !location ||
+                !dateRange?.from ||
+                !dateRange?.to ||
+                isSubmitting
               }
               className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
             >
