@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -37,6 +37,7 @@ import {
   useJsApiLoader,
   Marker,
   InfoWindow,
+  StandaloneSearchBox,
 } from "@react-google-maps/api";
 import { useTrips } from "@/context/trip-context";
 
@@ -266,7 +267,11 @@ export default function TripOverview() {
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    libraries: ["places"],
   });
+
+  // Add map reference
+  const mapRef = useRef<google.maps.Map | null>(null);
 
   // Update map center based on trip location
   useEffect(() => {
@@ -452,6 +457,76 @@ export default function TripOverview() {
 
   // Check if middle panel should be shown
   const showMiddlePanel = selectedCategory || isAddingActivity;
+
+  // Add these new state variables
+  const [searchBox, setSearchBox] =
+    useState<google.maps.places.SearchBox | null>(null);
+  const [searchedLocation, setSearchedLocation] = useState<{
+    position: google.maps.LatLngLiteral;
+    address: string;
+    name: string;
+    placeId: string;
+  } | null>(null);
+
+  // Setup Places SearchBox
+  const onSearchBoxLoad = (ref: google.maps.places.SearchBox) => {
+    setSearchBox(ref);
+  };
+
+  // Handle place selection
+  const onPlacesChanged = () => {
+    if (searchBox) {
+      const places = searchBox.getPlaces();
+      if (places && places.length > 0) {
+        const place = places[0];
+        if (place.geometry && place.geometry.location) {
+          // Center the map on the selected place
+          if (mapRef.current) {
+            mapRef.current.panTo(place.geometry.location);
+            mapRef.current.setZoom(14);
+          }
+
+          // Store location details for display
+          setSearchedLocation({
+            position: {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            },
+            address: place.formatted_address || "",
+            name: place.name || "",
+            placeId: place.place_id || "",
+          });
+
+          // Open the middle panel to show details
+          setSelectedCategory("searchResult");
+        }
+      }
+    }
+  };
+
+  const getMiddlePanelTitle = () => {
+    if (selectedCategory === "searchResult") {
+      return "Location Details";
+    } else {
+      return getCategoryDisplayName();
+    }
+  };
+
+  // Add this function if it doesn't exist
+  const getCategoryDisplayName = () => {
+    switch (selectedCategory) {
+      case "restaurants":
+        return "Restaurants";
+      case "activities":
+        return "Things to do";
+      case "hotels":
+        return "Hotels";
+      case "museums":
+        return "Museums";
+      default:
+        return "Results";
+    }
+  };
 
   if (!trip) return null;
 
@@ -666,20 +741,73 @@ export default function TripOverview() {
                 <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
                   <div className="flex items-center p-2">
                     <Search className="ml-2 h-5 w-5 text-gray-500" />
-                    <Input
-                      placeholder={getSearchPlaceholder()}
-                      className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-gray-500"
-                      onClick={closeMiddlePanel}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    {isLoaded && (
+                      <StandaloneSearchBox
+                        onLoad={onSearchBoxLoad}
+                        onPlacesChanged={onPlacesChanged}
+                      >
+                        <Input
+                          placeholder={getSearchPlaceholder()}
+                          className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </StandaloneSearchBox>
+                    )}
+                    {selectedCategory === "searchResult" && searchedLocation ? (
+                      <div className="p-4">
+                        <h2 className="text-lg font-semibold mb-2">
+                          {searchedLocation.name}
+                        </h2>
+                        <p className="text-sm text-gray-500 mb-4">
+                          {searchedLocation.address}
+                        </p>
+
+                        <div className="flex gap-4 mb-6">
+                          <Button className="flex-1">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add to Itinerary
+                          </Button>
+                          <Button variant="outline" className="flex-1">
+                            <MapPin className="mr-2 h-4 w-4" />
+                            Directions
+                          </Button>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-gray-500" />
+                            <span className="text-sm">
+                              {searchedLocation.address}
+                            </span>
+                          </div>
+
+                          <div className="border-t border-gray-200 pt-4">
+                            <h3 className="font-medium mb-2">Nearby Places</h3>
+                            <div className="space-y-2">
+                              <p className="text-sm text-blue-600 cursor-pointer">
+                                Find restaurants
+                              </p>
+                              <p className="text-sm text-blue-600 cursor-pointer">
+                                Find hotels
+                              </p>
+                              <p className="text-sm text-blue-600 cursor-pointer">
+                                Find attractions
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-500 ml-auto"
+                        onClick={closeMiddlePanel}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -904,6 +1032,9 @@ export default function TripOverview() {
                     mapContainerStyle={{ width: "100%", height: "100%" }}
                     center={mapCenter}
                     zoom={12}
+                    onLoad={(map) => {
+                      mapRef.current = map;
+                    }}
                     options={{
                       zoomControl: false, // We have our own zoom buttons
                       mapTypeControl: false,
@@ -973,6 +1104,19 @@ export default function TripOverview() {
                         </div>
                       </InfoWindow>
                     )}
+                    {/* Searched Location Marker */}
+                    {searchedLocation && (
+                      <Marker
+                        position={searchedLocation.position}
+                        animation={google.maps.Animation.DROP}
+                        onClick={() => {
+                          setSelectedMarker({
+                            id: 999, // Use a unique ID
+                            title: searchedLocation.name,
+                          });
+                        }}
+                      />
+                    )}
                   </GoogleMap>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
@@ -990,7 +1134,7 @@ export default function TripOverview() {
                       <Search className="ml-2 h-5 w-5 text-gray-500" />
                       <Input
                         placeholder={getSearchPlaceholder()}
-                        className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0"
+                        className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
@@ -998,18 +1142,19 @@ export default function TripOverview() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-gray-500"
+                          className="h-8 w-8 text-gray-500 ml-auto"
                           onClick={() => {
                             setSelectedCategory("");
                             setSearchQuery("");
                           }}
-                        />
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
                   </div>
 
                   {/* Category Buttons */}
-                  {/* <div className="absolute left-4 top-20 z-10 flex gap-2 overflow-x-auto"> */}
                   <div className="flex gap-2">
                     <Button
                       variant={
