@@ -468,20 +468,82 @@ export default function TripOverview() {
     placeId: string;
   } | null>(null);
 
-  // Setup Places SearchBox
-  const onSearchBoxLoad = (ref: google.maps.places.SearchBox) => {
-    setSearchBox(ref);
+  // Add these new state variables for custom autocomplete
+  const [predictions, setPredictions] = useState<
+    google.maps.places.AutocompletePrediction[]
+  >([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const autocompleteService =
+    useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+
+  // Setup Places autocomplete service
+  useEffect(() => {
+    if (isLoaded && mapRef.current) {
+      autocompleteService.current =
+        new google.maps.places.AutocompleteService();
+      placesService.current = new google.maps.places.PlacesService(
+        mapRef.current
+      );
+    }
+  }, [isLoaded, mapRef.current]);
+
+  // Handle search input changes
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+
+    if (value.length > 2 && autocompleteService.current) {
+      autocompleteService.current.getPlacePredictions(
+        { input: value },
+        (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            setPredictions(results);
+            setShowPredictions(true);
+          }
+        }
+      );
+    } else {
+      setPredictions([]);
+      setShowPredictions(false);
+    }
   };
 
-  // Handle place selection
-  const onPlacesChanged = () => {
-    if (searchBox) {
-      const places = searchBox.getPlaces();
-      if (places && places.length > 0) {
-        const place = places[0];
-        if (place.geometry && place.geometry.location) {
+  // Handle selecting a prediction
+  const handleSelectPrediction = (
+    prediction: google.maps.places.AutocompletePrediction | null,
+    isCustom = false
+  ) => {
+    setShowPredictions(false);
+
+    if (isCustom) {
+      // For custom selection, we'll just use the text as the name
+      setSearchedLocation({
+        position: mapCenter, // Default to current map center
+        address: searchQuery,
+        name: searchQuery,
+        placeId: "custom-location",
+      });
+
+      setSelectedCategory("searchResult");
+      return;
+    }
+
+    if (!prediction || !placesService.current) return;
+
+    placesService.current.getDetails(
+      {
+        placeId: prediction.place_id,
+        fields: ["name", "geometry", "formatted_address"],
+      },
+      (place, status) => {
+        if (
+          status === google.maps.places.PlacesServiceStatus.OK &&
+          place &&
+          place.geometry
+        ) {
           // Center the map on the selected place
-          if (mapRef.current) {
+          if (mapRef.current && place.geometry.location) {
             mapRef.current.panTo(place.geometry.location);
             mapRef.current.setZoom(14);
           }
@@ -489,8 +551,8 @@ export default function TripOverview() {
           // Store location details for display
           setSearchedLocation({
             position: {
-              lat: place.geometry.location.lat(),
-              lng: place.geometry.location.lng(),
+              lat: place.geometry.location!.lat(),
+              lng: place.geometry.location!.lng(),
             },
             address: place.formatted_address || "",
             name: place.name || "",
@@ -501,7 +563,7 @@ export default function TripOverview() {
           setSelectedCategory("searchResult");
         }
       }
-    }
+    );
   };
 
   const getMiddlePanelTitle = () => {
@@ -741,73 +803,55 @@ export default function TripOverview() {
                 <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
                   <div className="flex items-center p-2">
                     <Search className="ml-2 h-5 w-5 text-gray-500" />
-                    {isLoaded && (
-                      <StandaloneSearchBox
-                        onLoad={onSearchBoxLoad}
-                        onPlacesChanged={onPlacesChanged}
-                      >
-                        <Input
-                          placeholder={getSearchPlaceholder()}
-                          className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </StandaloneSearchBox>
-                    )}
-                    {selectedCategory === "searchResult" && searchedLocation ? (
-                      <div className="p-4">
-                        <h2 className="text-lg font-semibold mb-2">
-                          {searchedLocation.name}
-                        </h2>
-                        <p className="text-sm text-gray-500 mb-4">
-                          {searchedLocation.address}
-                        </p>
+                    <div className="flex-1 relative">
+                      <Input
+                        placeholder={getSearchPlaceholder()}
+                        className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
+                        value={searchQuery}
+                        onChange={handleSearchInputChange}
+                        onFocus={() =>
+                          searchQuery.length > 2 && setShowPredictions(true)
+                        }
+                      />
 
-                        <div className="flex gap-4 mb-6">
-                          <Button className="flex-1">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add to Itinerary
-                          </Button>
-                          <Button variant="outline" className="flex-1">
-                            <MapPin className="mr-2 h-4 w-4" />
-                            Directions
-                          </Button>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-gray-500" />
-                            <span className="text-sm">
-                              {searchedLocation.address}
+                      {showPredictions && (
+                        <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
+                          <div
+                            className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
+                            onClick={() => handleSelectPrediction(null, true)}
+                          >
+                            <span>{searchQuery}</span>
+                            <span className="text-gray-500 text-sm">
+                              custom
                             </span>
                           </div>
 
-                          <div className="border-t border-gray-200 pt-4">
-                            <h3 className="font-medium mb-2">Nearby Places</h3>
-                            <div className="space-y-2">
-                              <p className="text-sm text-blue-600 cursor-pointer">
-                                Find restaurants
-                              </p>
-                              <p className="text-sm text-blue-600 cursor-pointer">
-                                Find hotels
-                              </p>
-                              <p className="text-sm text-blue-600 cursor-pointer">
-                                Find attractions
-                              </p>
+                          {predictions.map((prediction) => (
+                            <div
+                              key={prediction.place_id}
+                              className="p-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => handleSelectPrediction(prediction)}
+                            >
+                              <div className="flex items-center">
+                                <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                                <span>{prediction.description}</span>
+                              </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-500 ml-auto"
-                        onClick={closeMiddlePanel}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-500 ml-auto"
+                      onClick={() => {
+                        closeMiddlePanel();
+                        setShowPredictions(false);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -878,11 +922,17 @@ export default function TripOverview() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold capitalize">
-                      {isAddingActivity ? "Recent Searches" : "Results"}
+                      {isAddingActivity && !searchedLocation
+                        ? "Recent Searches"
+                        : selectedCategory === "searchResult"
+                        ? "Activity Details"
+                        : "Results"}
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {isAddingActivity
+                      {isAddingActivity && !searchedLocation
                         ? "Search for a location to add"
+                        : selectedCategory === "searchResult"
+                        ? searchedLocation?.name || "Search result"
                         : `${
                             getCurrentCategoryData().length
                           } options available`}
@@ -951,7 +1001,7 @@ export default function TripOverview() {
               </div>
               <ScrollArea className="flex-1">
                 <div className="grid gap-4 p-4">
-                  {isAddingActivity ? (
+                  {isAddingActivity && !searchedLocation ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <div className="mb-4 rounded-full bg-muted/50 p-3">
                         <Search className="h-6 w-6 text-gray-500 dark:text-gray-400" />
@@ -963,6 +1013,51 @@ export default function TripOverview() {
                         Type in the search bar above to find places to add to
                         your itinerary
                       </p>
+                    </div>
+                  ) : selectedCategory === "searchResult" &&
+                    searchedLocation ? (
+                    <div className="p-4">
+                      <h2 className="text-lg font-semibold mb-2">
+                        {searchedLocation.name}
+                      </h2>
+                      <p className="text-sm text-gray-500 mb-4">
+                        {searchedLocation.address}
+                      </p>
+
+                      <div className="flex gap-4 mb-6">
+                        <Button className="flex-1">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add to Itinerary
+                        </Button>
+                        <Button variant="outline" className="flex-1">
+                          <MapPin className="mr-2 h-4 w-4" />
+                          Directions
+                        </Button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-5 w-5 text-gray-500" />
+                          <span className="text-sm">
+                            {searchedLocation.address}
+                          </span>
+                        </div>
+
+                        <div className="border-t border-gray-200 pt-4">
+                          <h3 className="font-medium mb-2">Nearby Places</h3>
+                          <div className="space-y-2">
+                            <p className="text-sm text-blue-600 cursor-pointer">
+                              Find restaurants
+                            </p>
+                            <p className="text-sm text-blue-600 cursor-pointer">
+                              Find hotels
+                            </p>
+                            <p className="text-sm text-blue-600 cursor-pointer">
+                              Find attractions
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     getCurrentCategoryData().map((item) => (
@@ -1132,12 +1227,46 @@ export default function TripOverview() {
                   <div className="w-[550px] rounded-full bg-white shadow-lg">
                     <div className="flex items-center p-2">
                       <Search className="ml-2 h-5 w-5 text-gray-500" />
-                      <Input
-                        placeholder={getSearchPlaceholder()}
-                        className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
+                      <div className="flex-1 relative">
+                        <Input
+                          placeholder={getSearchPlaceholder()}
+                          className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
+                          value={searchQuery}
+                          onChange={handleSearchInputChange}
+                          onFocus={() =>
+                            searchQuery.length > 2 && setShowPredictions(true)
+                          }
+                        />
+
+                        {showPredictions && (
+                          <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
+                            <div
+                              className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
+                              onClick={() => handleSelectPrediction(null, true)}
+                            >
+                              <span>{searchQuery}</span>
+                              <span className="text-gray-500 text-sm">
+                                custom
+                              </span>
+                            </div>
+
+                            {predictions.map((prediction) => (
+                              <div
+                                key={prediction.place_id}
+                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() =>
+                                  handleSelectPrediction(prediction)
+                                }
+                              >
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                                  <span>{prediction.description}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       {selectedCategory && (
                         <Button
                           variant="ghost"
@@ -1146,6 +1275,7 @@ export default function TripOverview() {
                           onClick={() => {
                             setSelectedCategory("");
                             setSearchQuery("");
+                            setShowPredictions(false);
                           }}
                         >
                           <X className="h-4 w-4" />
