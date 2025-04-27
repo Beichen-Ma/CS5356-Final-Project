@@ -16,6 +16,11 @@ import {
   Landmark,
   Hotel,
   X,
+  Heart,
+  MoreVertical,
+  Edit,
+  Trash,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +45,29 @@ import {
   StandaloneSearchBox,
 } from "@react-google-maps/api";
 import { useTrips } from "@/context/trip-context";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // Sample trip data
 const tripsData = {
@@ -243,6 +271,23 @@ const tripsData = {
   },
 };
 
+// Update the activity interface to include position data
+// Add this near the top of the file where we define types
+interface ActivityPosition {
+  lat: number;
+  lng: number;
+}
+
+interface Activity {
+  id: number;
+  time: string;
+  title: string;
+  description: string;
+  location: string;
+  category: string;
+  position?: ActivityPosition;
+}
+
 export default function TripOverview() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -272,6 +317,9 @@ export default function TripOverview() {
 
   // Add map reference
   const mapRef = useRef<google.maps.Map | null>(null);
+
+  // Add search input ref for focusing
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Update map center based on trip location
   useEffect(() => {
@@ -379,15 +427,26 @@ export default function TripOverview() {
 
   // Map markers for the selected day
   const getMapMarkers = () => {
-    return (
-      trip?.activities[selectedDay as keyof typeof trip.activities]?.map(
-        (activity) => ({
-          id: activity.id,
-          title: activity.title,
-          location: activity.location,
-        })
-      ) || []
-    );
+    if (!trip) return [];
+
+    const dayActivities =
+      trip.activities[selectedDay as keyof typeof trip.activities] || [];
+
+    return dayActivities.map((activity: any, index) => {
+      // Use stored position if available, otherwise create a position based on index
+      const position = activity.position || {
+        lat: mapCenter.lat + ((index % 5) * 0.01 - 0.02),
+        lng: mapCenter.lng + (Math.floor(index / 5) * 0.01 - 0.02),
+      };
+
+      return {
+        id: activity.id,
+        title: activity.title,
+        location: activity.location,
+        position: position,
+        index: index + 1,
+      };
+    });
   };
 
   // Get category-specific filters
@@ -401,6 +460,8 @@ export default function TripOverview() {
         return ["All", "Luxury", "Boutique", "Mid-range", "B&B", "Lodge"];
       case "museums":
         return ["All", "Art", "Science", "History", "Interactive", "Specialty"];
+      case "searchResult":
+        return []; // Return empty array for search results
       default:
         return ["All"];
     }
@@ -424,6 +485,13 @@ export default function TripOverview() {
     setIsAddingActivity(true);
     setSelectedCategory(""); // Clear selected category
     setSearchQuery(""); // Clear search query
+
+    // Focus the search input after state updates
+    setTimeout(() => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    }, 100);
   };
 
   // Close middle panel
@@ -440,13 +508,13 @@ export default function TripOverview() {
     } else if (selectedCategory) {
       switch (selectedCategory) {
         case "restaurants":
-          return "Restaurants";
+          return "Saved Restaurants";
         case "activities":
-          return "Things to do";
+          return "Saved Things to do";
         case "hotels":
-          return "Hotels";
+          return "Saved Hotels";
         case "museums":
-          return "Museums";
+          return "Saved Museums";
         default:
           return "Search on map...";
       }
@@ -466,6 +534,7 @@ export default function TripOverview() {
     address: string;
     name: string;
     placeId: string;
+    placeTypes?: string[];
   } | null>(null);
 
   // Add these new state variables for custom autocomplete
@@ -509,6 +578,9 @@ export default function TripOverview() {
     }
   };
 
+  // Add this new state variable with the other state variables
+  const [activityName, setActivityName] = useState("");
+
   // Handle selecting a prediction
   const handleSelectPrediction = (
     prediction: google.maps.places.AutocompletePrediction | null,
@@ -523,7 +595,11 @@ export default function TripOverview() {
         address: searchQuery,
         name: searchQuery,
         placeId: "custom-location",
+        placeTypes: ["custom"], // Default type for custom locations
       });
+
+      // Initialize the activity name with the location name
+      setActivityName(searchQuery);
 
       setSelectedCategory("searchResult");
       return;
@@ -534,7 +610,7 @@ export default function TripOverview() {
     placesService.current.getDetails(
       {
         placeId: prediction.place_id,
-        fields: ["name", "geometry", "formatted_address"],
+        fields: ["name", "geometry", "formatted_address", "types"], // Added types field
       },
       (place, status) => {
         if (
@@ -557,7 +633,11 @@ export default function TripOverview() {
             address: place.formatted_address || "",
             name: place.name || "",
             placeId: place.place_id || "",
+            placeTypes: place.types || [], // Store the place types
           });
+
+          // Initialize the activity name with the location name
+          setActivityName(place.name || "");
 
           // Open the middle panel to show details
           setSelectedCategory("searchResult");
@@ -566,31 +646,261 @@ export default function TripOverview() {
     );
   };
 
-  const getMiddlePanelTitle = () => {
-    if (selectedCategory === "searchResult") {
-      return "Location Details";
-    } else {
-      return getCategoryDisplayName();
-    }
+  // Add these new state variables below the other state variables declarations
+  const [editMode, setEditMode] = useState(false);
+  const [activityTime, setActivityTime] = useState("");
+  const [activityDescription, setActivityDescription] = useState("");
+
+  // Add a helper function to get a friendly place type name
+  const getPlaceTypeName = (types: string[] | undefined): string => {
+    if (!types || types.length === 0) return "Place";
+
+    // Map common Google place types to user-friendly names
+    if (types.includes("restaurant") || types.includes("food"))
+      return "Restaurant";
+    if (types.includes("cafe")) return "Restaurant";
+    if (types.includes("bar")) return "Restaurant";
+    if (types.includes("hotel") || types.includes("lodging")) return "Hotel";
+    if (types.includes("museum")) return "Museum";
+    if (types.includes("park")) return "Things to do";
+    if (types.includes("tourist_attraction")) return "Things to do";
+    if (types.includes("store") || types.includes("Things to do"))
+      return "Shop";
+    if (types.includes("movie_theater")) return "Things to do";
+    if (types.includes("gym")) return "Things to do";
+    if (types.includes("custom")) return "Things to do";
+
+    // Default to a generic name
+    return "Things to do";
   };
 
-  // Add this function if it doesn't exist
-  const getCategoryDisplayName = () => {
-    switch (selectedCategory) {
-      case "restaurants":
-        return "Restaurants";
-      case "activities":
-        return "Things to do";
-      case "hotels":
-        return "Hotels";
-      case "museums":
-        return "Museums";
-      default:
-        return "Results";
-    }
+  // Add this new state variable with the other state variables
+  const [editingActivityId, setEditingActivityId] = useState<number | null>(
+    null
+  );
+
+  // Add these handler functions after the other handler functions
+  const handleEditActivity = (activity: any) => {
+    // Set the activity details to edit
+    setActivityName(activity.title);
+    setActivityTime(activity.time);
+    setActivityDescription(activity.description);
+
+    // Create a searchedLocation object from the activity
+    setSearchedLocation({
+      position: activity.position || mapCenter, // Use stored position if available
+      address: activity.location,
+      name: activity.title,
+      placeId: `activity-${activity.id}`,
+      placeTypes: [activity.category.toLowerCase()],
+    });
+
+    // Set the edit mode
+    setSelectedCategory("searchResult");
+    setEditMode(true);
+
+    // Store the activity ID for updating
+    setEditingActivityId(activity.id);
   };
+
+  const handleDeleteActivity = (activityId: number) => {
+    if (!trip || !selectedDay) return;
+
+    // Create a copy of the current trip
+    const updatedTrip = { ...trip };
+
+    // Filter out the activity with the given ID
+    updatedTrip.activities[selectedDay] = updatedTrip.activities[
+      selectedDay
+    ].filter((activity: any) => activity.id !== activityId);
+
+    // Update the trip
+    setTrip(updatedTrip);
+  };
+
+  // Modify the handleAddToItinerary function to handle updates
+  const handleAddToItinerary = () => {
+    if (!trip || !selectedDay) return;
+
+    // Create a new activity object
+    const newActivity = {
+      id: editingActivityId || Date.now(), // Use existing ID if editing, or create new one
+      time: activityTime || "",
+      title: activityName || (searchedLocation ? searchedLocation.name : ""),
+      description: activityDescription || "",
+      location: searchedLocation ? searchedLocation.address : "",
+      category: searchedLocation
+        ? getPlaceTypeName(searchedLocation.placeTypes)
+        : "Place",
+      // Store the position if we have it from searchedLocation
+      position: searchedLocation ? searchedLocation.position : undefined,
+    };
+
+    // Create a copy of the current trip
+    const updatedTrip = { ...trip };
+
+    // Ensure the day property exists on activities
+    if (!updatedTrip.activities[selectedDay]) {
+      updatedTrip.activities[selectedDay] = [];
+    }
+
+    if (editingActivityId) {
+      // Update existing activity
+      updatedTrip.activities[selectedDay] = updatedTrip.activities[
+        selectedDay
+      ].map((activity: any) =>
+        activity.id === editingActivityId ? newActivity : activity
+      );
+    } else {
+      // Add a new activity
+      updatedTrip.activities[selectedDay] = [
+        ...updatedTrip.activities[selectedDay],
+        newActivity,
+      ];
+    }
+
+    // Update the trip
+    setTrip(updatedTrip);
+
+    // Reset the UI state
+    setSelectedCategory("");
+    setIsAddingActivity(false);
+    setSearchQuery("");
+    setSearchedLocation(null);
+    setActivityName("");
+    setActivityTime("");
+    setActivityDescription("");
+    setEditMode(false);
+    setEditingActivityId(null);
+  };
+
+  // Add a function to handle reordering of activities
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!trip || !over || active.id === over.id) return;
+
+    const currentActivities = trip.activities[selectedDay];
+    if (!currentActivities) return;
+
+    const oldIndex = currentActivities.findIndex(
+      (activity: any) => activity.id === active.id
+    );
+    const newIndex = currentActivities.findIndex(
+      (activity: any) => activity.id === over.id
+    );
+
+    // Create a copy of the trip
+    const updatedTrip = { ...trip };
+
+    // Reorder the activities
+    updatedTrip.activities[selectedDay] = arrayMove(
+      currentActivities,
+      oldIndex,
+      newIndex
+    );
+
+    // Update the trip state
+    setTrip(updatedTrip);
+  };
+
+  // Initialize sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Create a separate SortableActivityCard component to use with the sortable context
+  function SortableActivityCard({
+    activity,
+    index,
+  }: {
+    activity: any;
+    index: number;
+  }) {
+    const { attributes, listeners, setNodeRef, transform, transition } =
+      useSortable({ id: activity.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <Card
+        key={activity.id}
+        ref={setNodeRef}
+        style={style}
+        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center">
+              <div
+                {...attributes}
+                {...listeners}
+                className="absolute -left-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center cursor-grab active:cursor-grabbing"
+              >
+                <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              </div>
+              <div className="ml-12">
+                <CardTitle className="text-base">{activity.title}</CardTitle>
+                <CardDescription className="text-xs">
+                  {activity.time}
+                </CardDescription>
+              </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-gray-500"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleEditActivity(activity)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit info
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleDeleteActivity(activity.id)}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-2 pl-[5.5rem]">
+          <p className="text-sm">{activity.description}</p>
+        </CardContent>
+        <CardFooter className="pl-[5.5rem] pt-0">
+          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+            <MapPin className="mr-1 h-3 w-3" />
+            {activity.location}
+          </div>
+          <Badge
+            variant="outline"
+            className="ml-auto border-gray-200 dark:border-gray-700"
+          >
+            {activity.category}
+          </Badge>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   if (!trip) return null;
+
+  // Get the activities for the selected day
+  const dayActivities =
+    trip.activities[selectedDay as keyof typeof trip.activities] || [];
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
@@ -726,48 +1036,27 @@ export default function TripOverview() {
                   {trip.days.find((day) => day.id === selectedDay)?.date}
                 </h3>
                 <div className="space-y-4">
-                  {trip.activities[selectedDay as keyof typeof trip.activities]
-                    ?.length > 0 ? (
-                    trip.activities[
-                      selectedDay as keyof typeof trip.activities
-                    ]?.map((activity, index) => (
-                      <Card
-                        key={activity.id}
-                        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
+                  {dayActivities.length > 0 ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={dayActivities.map(
+                          (activity: any) => activity.id
+                        )}
+                        strategy={verticalListSortingStrategy}
                       >
-                        <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-300 dark:bg-gray-600" />
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center">
-                            <div className="absolute -left-1 top-6 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 bg-background">
-                              <Clock className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                            </div>
-                            <div className="ml-12">
-                              <CardTitle className="text-base">
-                                {activity.title}
-                              </CardTitle>
-                              <CardDescription className="text-xs">
-                                {activity.time}
-                              </CardDescription>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pb-2 pl-[5.5rem]">
-                          <p className="text-sm">{activity.description}</p>
-                        </CardContent>
-                        <CardFooter className="pl-[5.5rem] pt-0">
-                          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                            <MapPin className="mr-1 h-3 w-3" />
-                            {activity.location}
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="ml-auto border-gray-200 dark:border-gray-700"
-                          >
-                            {activity.category}
-                          </Badge>
-                        </CardFooter>
-                      </Card>
-                    ))
+                        {dayActivities.map((activity: any, index: number) => (
+                          <SortableActivityCard
+                            key={activity.id}
+                            activity={activity}
+                            index={index}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <div className="mb-4 rounded-full bg-muted/50 p-3">
@@ -812,6 +1101,7 @@ export default function TripOverview() {
                         onFocus={() =>
                           searchQuery.length > 2 && setShowPredictions(true)
                         }
+                        ref={searchInputRef}
                       />
 
                       {showPredictions && (
@@ -932,72 +1222,87 @@ export default function TripOverview() {
                       {isAddingActivity && !searchedLocation
                         ? "Search for a location to add"
                         : selectedCategory === "searchResult"
-                        ? searchedLocation?.name || "Search result"
+                        ? "Edit details below to customize this activity"
                         : `${
                             getCurrentCategoryData().length
                           } options available`}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4">
+                  {selectedCategory === "searchResult" ? (
                     <Button
                       variant="ghost"
-                      className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-black hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white"
+                      className="text-sm font-medium"
+                      onClick={() => setEditMode(!editMode)}
                     >
-                      Sort by
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="ml-1 h-4 w-4"
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
+                      {editMode ? "Done" : "Edit"}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:shadow-md transition-shadow dark:text-blue-400"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-4 w-4"
+                  ) : isAddingActivity && !searchedLocation ? (
+                    // Don't show any buttons for Recent Searches
+                    <></>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                      <Button
+                        variant="ghost"
+                        className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-black hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white"
                       >
-                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                        <polyline points="16 6 12 2 8 6" />
-                        <line x1="12" y1="2" x2="12" y2="15" />
-                      </svg>
-                      Share
-                    </Button>
-                  </div>
+                        Sort by
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="ml-1 h-4 w-4"
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:shadow-md transition-shadow dark:text-blue-400"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4"
+                        >
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                          <polyline points="16 6 12 2 8 6" />
+                          <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                        Share
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="border-b border-gray-200 dark:border-gray-700">
-                <Tabs defaultValue="all">
-                  <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-700 bg-transparent p-0 overflow-x-auto">
-                    {getCategoryFilters().map((filter) => (
-                      <TabsTrigger
-                        key={filter.toLowerCase()}
-                        value={filter.toLowerCase()}
-                        className="rounded-none border-b-2 border-b-transparent px-4 py-2 data-[state=active]:border-b-black dark:data-[state=active]:border-b-white data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white"
-                      >
-                        {filter}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+                {selectedCategory !== "searchResult" && !isAddingActivity && (
+                  <Tabs defaultValue="all">
+                    <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-700 bg-transparent p-0 overflow-x-auto">
+                      {getCategoryFilters().map((filter) => (
+                        <TabsTrigger
+                          key={filter.toLowerCase()}
+                          value={filter.toLowerCase()}
+                          className="rounded-none border-b-2 border-b-transparent px-4 py-2 data-[state=active]:border-b-black dark:data-[state=active]:border-b-white data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white"
+                        >
+                          {filter}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                )}
               </div>
               <ScrollArea className="flex-1">
                 <div className="grid gap-4 p-4">
@@ -1017,46 +1322,103 @@ export default function TripOverview() {
                   ) : selectedCategory === "searchResult" &&
                     searchedLocation ? (
                     <div className="p-4">
-                      <h2 className="text-lg font-semibold mb-2">
-                        {searchedLocation.name}
-                      </h2>
-                      <p className="text-sm text-gray-500 mb-4">
-                        {searchedLocation.address}
-                      </p>
+                      {editMode ? (
+                        <div className="mb-4">
+                          <label className="text-sm font-medium">
+                            Activity Name
+                          </label>
+                          <Input
+                            value={activityName}
+                            onChange={(e) => setActivityName(e.target.value)}
+                            placeholder="Enter activity name"
+                            className="mt-1"
+                          />
+                        </div>
+                      ) : (
+                        <h2 className="text-lg font-semibold mb-2">
+                          {activityName || searchedLocation.name}
+                        </h2>
+                      )}
 
-                      <div className="flex gap-4 mb-6">
-                        <Button className="flex-1">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add to Itinerary
-                        </Button>
-                        <Button variant="outline" className="flex-1">
-                          <MapPin className="mr-2 h-4 w-4" />
-                          Directions
-                        </Button>
-                      </div>
-
-                      <div className="space-y-4">
+                      <div className="space-y-3 mb-4">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-5 w-5 text-gray-500" />
                           <span className="text-sm">
                             {searchedLocation.address}
                           </span>
                         </div>
+                      </div>
 
-                        <div className="border-t border-gray-200 pt-4">
-                          <h3 className="font-medium mb-2">Nearby Places</h3>
-                          <div className="space-y-2">
-                            <p className="text-sm text-blue-600 cursor-pointer">
-                              Find restaurants
-                            </p>
-                            <p className="text-sm text-blue-600 cursor-pointer">
-                              Find hotels
-                            </p>
-                            <p className="text-sm text-blue-600 cursor-pointer">
-                              Find attractions
-                            </p>
+                      {editMode ? (
+                        <div className="space-y-4 mb-6">
+                          <div>
+                            <label className="text-sm font-medium">Time</label>
+                            <Input
+                              value={activityTime}
+                              onChange={(e) => setActivityTime(e.target.value)}
+                              placeholder="Enter time (e.g. 9:00 AM)"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">
+                              Remarks
+                            </label>
+                            <Input
+                              value={activityDescription}
+                              onChange={(e) =>
+                                setActivityDescription(e.target.value)
+                              }
+                              placeholder="Enter remarks"
+                              className="mt-1"
+                            />
                           </div>
                         </div>
+                      ) : (
+                        <div className="space-y-3 mb-6">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-5 w-5 text-gray-500" />
+                            <span className="text-sm">
+                              {activityTime || "No time specified"}
+                            </span>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-5 w-5 text-gray-500 mt-0.5"
+                            >
+                              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                              <path d="M13 2v7h7" />
+                            </svg>
+                            <span className="text-sm">
+                              {activityDescription || "Custom remarks"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-4 mb-6">
+                        <Button
+                          className="flex-1"
+                          onClick={handleAddToItinerary}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          {editingActivityId
+                            ? "Update Activity"
+                            : "Add to Itinerary"}
+                        </Button>
+                        <Button variant="outline" className="flex-1">
+                          <Heart className="mr-2 h-4 w-4" />
+                          Save {getPlaceTypeName(searchedLocation?.placeTypes)}
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -1139,19 +1501,17 @@ export default function TripOverview() {
                   >
                     {/* Render Activity Markers */}
                     {!selectedCategory &&
-                      getMapMarkers().map((marker, index) => (
+                      getMapMarkers().map((marker) => (
                         <Marker
                           key={marker.id}
-                          position={{
-                            // In a real app, you'd store actual coordinates with each activity
-                            // This is just creating dummy positions for visualization
-                            lat: mapCenter.lat + (Math.random() * 0.05 - 0.025),
-                            lng: mapCenter.lng + (Math.random() * 0.05 - 0.025),
-                          }}
+                          position={marker.position}
                           label={{
-                            text: (index + 1).toString(),
+                            text: marker.index.toString(),
                             color: "white",
                             className: "font-bold",
+                          }}
+                          icon={{
+                            url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
                           }}
                           onClick={() => setSelectedMarker(marker)}
                         />
@@ -1236,6 +1596,7 @@ export default function TripOverview() {
                           onFocus={() =>
                             searchQuery.length > 2 && setShowPredictions(true)
                           }
+                          ref={searchInputRef}
                         />
 
                         {showPredictions && (
