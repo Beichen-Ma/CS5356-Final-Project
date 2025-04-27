@@ -54,6 +54,7 @@ import {
   Marker,
   InfoWindow,
   StandaloneSearchBox,
+  DirectionsRenderer,
 } from "@react-google-maps/api";
 import { useTrips } from "@/context/trip-context";
 import {
@@ -384,80 +385,100 @@ export default function TripOverview() {
     }
   }, [tripId, router, getTrip]);
 
-  // Sample data for different categories
-  const categoryData = {
-    restaurants: [
-      {
-        id: 201,
-        title: "Oceanview Restaurant",
-        description:
-          "Fine dining with fresh seafood and panoramic ocean views.",
-        location: "100 Harbor Drive",
-        category: "Seafood",
-        rating: 4.8,
-        price: "$",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-      {
-        id: 202,
-        title: "Trattoria Italiana",
-        description:
-          "Authentic Italian cuisine in a cozy, family-friendly atmosphere.",
-        location: "250 Main Street",
-        category: "Italian",
-        rating: 4.6,
-        price: "$",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-    ],
-    activities: [
-      {
-        id: 101,
-        title: "Art Museum",
-        description:
-          "Explore contemporary and classical art from around the world.",
-        location: "100 Culture Blvd",
-        category: "Culture",
-        rating: 4.7,
-        price: "$",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-      {
-        id: 102,
-        title: "Waterfall Hike",
-        description:
-          "A moderate 2-hour hike to a spectacular 50-foot waterfall.",
-        location: "Wilderness Park Trail",
-        category: "Nature",
-        rating: 4.9,
-        price: "$",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-    ],
-    hotels: [
-      {
-        id: 301,
-        title: "Grand Oceanfront Resort",
-        description:
-          "Luxury beachfront resort with full amenities and spa services.",
-        location: "1 Beachfront Drive",
-        category: "Luxury",
-        rating: 4.9,
-        price: "$",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-    ],
+  // Define the saved locations interface
+  interface SavedLocation {
+    id: number;
+    title: string;
+    description: string;
+    location: string;
+    category: string;
+    rating?: number;
+    price?: string;
+    image?: string;
+    placeId?: string;
+    position?: ActivityPosition;
+  }
+
+  // Initialize state for saved locations
+  const [savedLocations, setSavedLocations] = useState<{
+    restaurants: SavedLocation[];
+    activities: SavedLocation[];
+    hotels: SavedLocation[];
+    museums: SavedLocation[];
+    transit: SavedLocation[];
+  }>({
+    restaurants: [],
+    activities: [],
+    hotels: [],
+    museums: [],
+    transit: [],
+  });
+
+  // Add the function to save a location
+  const saveLocation = () => {
+    if (!searchedLocation) return;
+
+    const placeType = getPlaceTypeName(searchedLocation.placeTypes);
+
+    // Map the place type to a category in our savedLocations state
+    let category:
+      | "restaurants"
+      | "activities"
+      | "hotels"
+      | "museums"
+      | "transit";
+
+    switch (placeType) {
+      case "Restaurant":
+        category = "restaurants";
+        break;
+      case "Hotel":
+        category = "hotels";
+        break;
+      case "Museum":
+        category = "museums";
+        break;
+      case "Transit":
+        category = "transit";
+        break;
+      default:
+        category = "activities"; // Default to activities for other types
+    }
+
+    // Create the saved location object
+    const newSavedLocation: SavedLocation = {
+      id: Date.now(), // Generate a unique ID
+      title: activityName || searchedLocation.name,
+      description: activityDescription || `Saved ${placeType.toLowerCase()}`,
+      location: searchedLocation.address,
+      category: placeType,
+      placeId: searchedLocation.placeId,
+      position: searchedLocation.position,
+    };
+
+    // Update the state with the new saved location
+    setSavedLocations((prev) => ({
+      ...prev,
+      [category]: [...prev[category], newSavedLocation],
+    }));
+
+    // Show a success message or feedback
+    alert(`Saved to ${category}!`);
   };
 
-  // Get current category data
+  // Modify the getCurrentCategoryData function to use the new state
   const getCurrentCategoryData = () => {
     switch (selectedCategory) {
       case "restaurants":
-        return categoryData.restaurants;
+        return savedLocations.restaurants;
       case "activities":
-        return categoryData.activities;
+        return savedLocations.activities;
       case "hotels":
-        return categoryData.hotels;
+        return savedLocations.hotels;
+      case "museums":
+        return savedLocations.museums;
+      case "transit":
+        return savedLocations.transit;
       default:
         return [];
     }
@@ -923,7 +944,7 @@ export default function TripOverview() {
         ref={setNodeRef}
         style={style}
         onClick={handleCardClick}
-        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer"
+        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer text-left"
       >
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between w-full">
@@ -935,9 +956,11 @@ export default function TripOverview() {
               >
                 <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
               </div>
-              <div className="ml-12">
-                <CardTitle className="text-base">{activity.title}</CardTitle>
-                <CardDescription className="text-xs">
+              <div className="ml-4">
+                <CardTitle className="text-base text-left">
+                  {activity.title}
+                </CardTitle>
+                <CardDescription className="text-xs text-left">
                   {activity.time}
                 </CardDescription>
               </div>
@@ -971,11 +994,11 @@ export default function TripOverview() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pb-2 pl-[5.5rem]">
-          <p className="text-sm">{activity.description}</p>
+        <CardContent className="pb-2 pl-[2.5rem]">
+          <p className="text-sm text-left">{activity.description}</p>
         </CardContent>
-        <CardFooter className="pl-[5.5rem] pt-0">
-          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+        <CardFooter className="pl-[2.5rem] pt-0">
+          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 text-left">
             <MapPin className="mr-1 h-3 w-3" />
             {activity.location}
           </div>
@@ -1507,6 +1530,76 @@ export default function TripOverview() {
     );
   }
 
+  // Add these new state variables near the other map-related state variables
+  const [showDirections, setShowDirections] = useState(false);
+  const [directionsResponse, setDirectionsResponse] =
+    useState<google.maps.DirectionsResult | null>(null);
+
+  // Add a function to calculate and display directions between activities
+  const calculateDirections = async () => {
+    if (!trip || !selectedDay || !isLoaded) {
+      console.log("Cannot calculate directions: missing prerequisites");
+      return;
+    }
+
+    const activities = trip.activities[selectedDay];
+    if (!activities || activities.length < 2) {
+      alert("Need at least two activities to show directions");
+      return;
+    }
+
+    console.log("Calculating directions for activities:", activities);
+
+    try {
+      const directionsService = new google.maps.DirectionsService();
+
+      // Create waypoints from activities (except first and last which are origin and destination)
+      const waypoints = activities.slice(1, -1).map((activity: any) => ({
+        location: activity.location,
+        stopover: true,
+      }));
+
+      console.log("Origin:", activities[0].location);
+      console.log("Destination:", activities[activities.length - 1].location);
+      console.log("Waypoints:", waypoints);
+
+      const result = await directionsService.route({
+        origin: activities[0].location,
+        destination: activities[activities.length - 1].location,
+        waypoints: waypoints,
+        optimizeWaypoints: false, // Keep the order as specified
+        travelMode: google.maps.TravelMode.DRIVING,
+      });
+
+      console.log("Directions result:", result);
+      setDirectionsResponse(result);
+      setShowDirections(true);
+
+      // Center the map on the route
+      if (mapRef.current && result.routes[0]?.bounds) {
+        mapRef.current.fitBounds(result.routes[0].bounds);
+      }
+    } catch (error) {
+      console.error("Error calculating directions:", error);
+      alert(
+        "Could not calculate directions. Please check activity addresses. Error: " +
+          error
+      );
+    }
+  };
+
+  // Add a toggle directions function
+  const toggleDirections = () => {
+    if (showDirections) {
+      // If directions are shown, hide them
+      setShowDirections(false);
+      setDirectionsResponse(null);
+    } else {
+      // If directions aren't shown, calculate and show them
+      calculateDirections();
+    }
+  };
+
   if (!trip) return null;
 
   // Get the activities for the selected day
@@ -1642,11 +1735,40 @@ export default function TripOverview() {
             </div>
             <ScrollArea className="flex-1">
               <div className="p-4">
-                <h3 className="text-lg font-semibold mb-4">
-                  {trip.days.find((day) => day.id === selectedDay)?.title} -{" "}
-                  {trip.days.find((day) => day.id === selectedDay)?.date}
-                </h3>
-                <div className="space-y-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">
+                    {trip.days.find((day) => day.id === selectedDay)?.title} -{" "}
+                    {trip.days.find((day) => day.id === selectedDay)?.date}
+                  </h3>
+                  {isLoaded && dayActivities.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1"
+                      onClick={toggleDirections}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M12 19V5" />
+                        <path d="M5 12h14" />
+                        <path d="m12 5-3 3 3-3 3 3-3-3z" />
+                        <path d="m12 19 3-3-3 3-3-3 3 3z" />
+                      </svg>
+                      {showDirections ? "Hide Route" : "Show Route"}
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-4 ">
                   {dayActivities.length > 0 ? (
                     <DndContext
                       sensors={sensors}
@@ -2032,7 +2154,11 @@ export default function TripOverview() {
                             ? "Update Activity"
                             : "Add to Itinerary"}
                         </Button>
-                        <Button variant="outline" className="flex-1">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={saveLocation}
+                        >
                           <Heart className="mr-2 h-4 w-4" />
                           Save {getPlaceTypeName(searchedLocation?.placeTypes)}
                         </Button>
@@ -2189,198 +2315,25 @@ export default function TripOverview() {
                         }}
                       />
                     )}
+                    {showDirections && directionsResponse && (
+                      <DirectionsRenderer
+                        directions={directionsResponse}
+                        options={{
+                          polylineOptions: {
+                            strokeColor: "#4285F4",
+                            strokeWeight: 5,
+                            strokeOpacity: 0.8,
+                          },
+                          suppressMarkers: false,
+                        }}
+                      />
+                    )}
                   </GoogleMap>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
                     <p>Loading map...</p>
                   </div>
                 )}
-              </div>
-
-              {/* Search and Category Controls - Floating above the map */}
-              {!showMiddlePanel && (
-                <div className="absolute left-4 top-4 z-10 flex flex-col gap-2">
-                  {/* Search Bar - Width matches the total width of all buttons */}
-                  <div className="w-[550px] rounded-full bg-white shadow-lg">
-                    <div className="flex items-center p-2">
-                      <Search className="ml-2 h-5 w-5 text-gray-500" />
-                      <div className="flex-1 relative">
-                        <Input
-                          placeholder={getSearchPlaceholder()}
-                          className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
-                          value={searchQuery}
-                          onChange={handleSearchInputChange}
-                          onFocus={() =>
-                            searchQuery.length > 2 && setShowPredictions(true)
-                          }
-                          ref={searchInputRef}
-                        />
-
-                        {showPredictions && (
-                          <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
-                            <div
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
-                              onClick={() => handleSelectPrediction(null, true)}
-                            >
-                              <span>{searchQuery}</span>
-                              <span className="text-gray-500 text-sm">
-                                custom
-                              </span>
-                            </div>
-
-                            {predictions.map((prediction) => (
-                              <div
-                                key={prediction.place_id}
-                                className="p-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() =>
-                                  handleSelectPrediction(prediction)
-                                }
-                              >
-                                <div className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                                  <span>{prediction.description}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {selectedCategory && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-500 ml-auto"
-                          onClick={() => {
-                            setSelectedCategory("");
-                            setSearchQuery("");
-                            setShowPredictions(false);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Category Buttons */}
-                  <div className="flex gap-2">
-                    <Button
-                      variant={
-                        selectedCategory === "restaurants"
-                          ? "default"
-                          : "secondary"
-                      }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                      onClick={() => handleCategorySelect("restaurants")}
-                    >
-                      <Utensils className="mr-2 h-4 w-4" />
-                      Restaurants
-                    </Button>
-                    <Button
-                      variant={
-                        selectedCategory === "hotels" ? "default" : "secondary"
-                      }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                      onClick={() => handleCategorySelect("hotels")}
-                    >
-                      <Hotel className="mr-2 h-4 w-4" />
-                      Hotels
-                    </Button>
-                    <Button
-                      variant={
-                        selectedCategory === "activities"
-                          ? "default"
-                          : "secondary"
-                      }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                      onClick={() => handleCategorySelect("activities")}
-                    >
-                      <Landmark className="mr-2 h-4 w-4" />
-                      Things to do
-                    </Button>
-                    <Button
-                      variant={
-                        selectedCategory === "museums" ? "default" : "secondary"
-                      }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                      onClick={() => handleCategorySelect("museums")}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="mr-2 h-4 w-4"
-                      >
-                        <path d="M2 20h20" />
-                        <path d="M5 4v16" />
-                        <path d="M19 4v16" />
-                        <path d="M5 4h14" />
-                        <path d="M5 12h14" />
-                      </svg>
-                      Museums
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Map Markers - Show either day activities or selected category items */}
-              <div className="absolute inset-0 pointer-events-none">
-                {selectedCategory
-                  ? getCurrentCategoryData().map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="absolute flex flex-col items-center"
-                        style={{
-                          left: `${15 + (index % 5) * 15}%`,
-                          top: `${20 + Math.floor(index / 5) * 15}%`,
-                        }}
-                      >
-                        <div
-                          className={`flex h-8 w-8 items-center justify-center rounded-full shadow-lg
-                          ${
-                            selectedCategory === "restaurants"
-                              ? "bg-rose-500"
-                              : selectedCategory === "activities"
-                              ? "bg-amber-500"
-                              : "bg-sky-500"
-                          } text-white`}
-                        >
-                          {selectedCategory === "restaurants" ? (
-                            <Utensils className="h-4 w-4" />
-                          ) : selectedCategory === "activities" ? (
-                            <Landmark className="h-4 w-4" />
-                          ) : (
-                            <Hotel className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className="mt-1 rounded-md bg-white p-2 text-xs shadow-md max-w-[120px] truncate">
-                          {item.title}
-                        </div>
-                      </div>
-                    ))
-                  : getMapMarkers().map((marker, index) => (
-                      <div
-                        key={marker.id}
-                        className="absolute flex flex-col items-center"
-                        style={{
-                          left: `${20 + index * 15}%`,
-                          top: `${30 + index * 10}%`,
-                        }}
-                      >
-                        {/* <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black dark:bg-white text-white dark:text-black shadow-lg">
-                          {index + 1}
-                        </div>
-                        <div className="mt-1 rounded-md bg-white p-2 text-xs shadow-md">
-                          {marker.title}
-                        </div> */}
-                      </div>
-                    ))}
               </div>
 
               {/* Map Controls */}
