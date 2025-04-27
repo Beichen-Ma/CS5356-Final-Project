@@ -670,6 +670,18 @@ export default function TripOverview() {
     if (types.includes("gym")) return "Things to do";
     if (types.includes("custom")) return "Things to do";
 
+    // Add transit detection for transportation-related places
+    if (
+      types.includes("airport") ||
+      types.includes("train_station") ||
+      types.includes("bus_station") ||
+      types.includes("transit_station") ||
+      types.includes("subway_station") ||
+      types.includes("light_rail_station") ||
+      types.includes("ferry_terminal")
+    )
+      return "Transit";
+
     // Default to a generic name
     return "Things to do";
   };
@@ -812,6 +824,10 @@ export default function TripOverview() {
     })
   );
 
+  // Add a state to track the selected marker position
+  const [selectedMarkerPosition, setSelectedMarkerPosition] =
+    useState<google.maps.LatLngLiteral | null>(null);
+
   // Create a separate SortableActivityCard component to use with the sortable context
   function SortableActivityCard({
     activity,
@@ -828,12 +844,47 @@ export default function TripOverview() {
       transition,
     };
 
+    // Add a handler to focus on the map marker when clicking the card
+    const handleCardClick = (e: React.MouseEvent) => {
+      // Don't trigger when clicking the grip handle or dropdown
+      if (
+        e.target instanceof Element &&
+        (e.target.closest('[role="button"]') ||
+          e.target.closest(".grip-handle") ||
+          e.target.closest(".dropdown-area"))
+      ) {
+        return;
+      }
+
+      // Find the marker position for this activity
+      const position = activity.position || {
+        lat: mapCenter.lat + ((index % 5) * 0.01 - 0.02),
+        lng: mapCenter.lng + (Math.floor(index / 5) * 0.01 - 0.02),
+      };
+
+      // Store the position for the InfoWindow
+      setSelectedMarkerPosition(position);
+
+      // Center the map on this position
+      if (mapRef.current) {
+        mapRef.current.panTo(position);
+        mapRef.current.setZoom(15);
+      }
+
+      // Select the marker to show its info window
+      setSelectedMarker({
+        id: activity.id,
+        title: activity.title,
+      });
+    };
+
     return (
       <Card
         key={activity.id}
         ref={setNodeRef}
         style={style}
-        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
+        onClick={handleCardClick}
+        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer"
       >
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between w-full">
@@ -841,7 +892,7 @@ export default function TripOverview() {
               <div
                 {...attributes}
                 {...listeners}
-                className="absolute -left-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center cursor-grab active:cursor-grabbing"
+                className="absolute -left-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center cursor-grab active:cursor-grabbing grip-handle"
               >
                 <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
               </div>
@@ -852,29 +903,33 @@ export default function TripOverview() {
                 </CardDescription>
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-gray-500"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleEditActivity(activity)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit info
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleDeleteActivity(activity.id)}
-                >
-                  <Trash className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="dropdown-area">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-gray-500"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => handleEditActivity(activity)}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit info
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteActivity(activity.id)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pb-2 pl-[5.5rem]">
@@ -1361,15 +1416,13 @@ export default function TripOverview() {
                             />
                           </div>
                           <div>
-                            <label className="text-sm font-medium">
-                              Remarks
-                            </label>
+                            <label className="text-sm font-medium">Notes</label>
                             <Input
                               value={activityDescription}
                               onChange={(e) =>
                                 setActivityDescription(e.target.value)
                               }
-                              placeholder="Enter remarks"
+                              placeholder="Enter notes"
                               className="mt-1"
                             />
                           </div>
@@ -1399,7 +1452,7 @@ export default function TripOverview() {
                               <path d="M13 2v7h7" />
                             </svg>
                             <span className="text-sm">
-                              {activityDescription || "Custom remarks"}
+                              {activityDescription || "Custom notes"}
                             </span>
                           </div>
                         </div>
@@ -1544,13 +1597,13 @@ export default function TripOverview() {
                       ))}
 
                     {/* Info Window for selected marker */}
-                    {selectedMarker && (
+                    {selectedMarker && selectedMarkerPosition && (
                       <InfoWindow
-                        position={{
-                          lat: mapCenter.lat + (Math.random() * 0.05 - 0.025),
-                          lng: mapCenter.lng + (Math.random() * 0.05 - 0.025),
+                        position={selectedMarkerPosition}
+                        onCloseClick={() => {
+                          setSelectedMarker(null);
+                          setSelectedMarkerPosition(null);
                         }}
-                        onCloseClick={() => setSelectedMarker(null)}
                       >
                         <div className="p-1">
                           <p className="font-medium text-sm">
