@@ -21,6 +21,11 @@ import {
   Edit,
   Trash,
   GripVertical,
+  Car,
+  ArrowRight,
+  Bike,
+  User,
+  Bus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +42,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   GoogleMap,
   useJsApiLoader,
@@ -286,6 +297,33 @@ interface Activity {
   location: string;
   category: string;
   position?: ActivityPosition;
+}
+
+interface TransitInfo {
+  origin: string;
+  destination: string;
+  driving: {
+    distance: string;
+    duration: string;
+    durationValue: number; // in seconds
+  };
+  walking?: {
+    distance: string;
+    duration: string;
+    durationValue: number;
+  };
+  bicycling?: {
+    distance: string;
+    duration: string;
+    durationValue: number;
+  };
+  transit?: {
+    distance: string;
+    duration: string;
+    durationValue: number;
+  };
+  _timestamp?: number; // Store when the transit info was calculated
+  selectedMode?: "walking" | "bicycling" | "driving" | "transit"; // Add this line
 }
 
 export default function TripOverview() {
@@ -671,6 +709,7 @@ export default function TripOverview() {
     if (types.includes("custom")) return "Things to do";
 
     // Add transit detection for transportation-related places
+    // TODO: only airport works for now, need to figure out how to detect other transit types
     if (
       types.includes("airport") ||
       types.includes("train_station") ||
@@ -951,6 +990,523 @@ export default function TripOverview() {
     );
   }
 
+  // Add state variables for transit info
+  const [transitInfo, setTransitInfo] = useState<{
+    [key: string]: TransitInfo;
+  }>({});
+  const [isLoadingTransit, setIsLoadingTransit] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  // Calculate transit information between two activities
+  const calculateTransit = async (
+    origin: string,
+    destination: string,
+    transitKey: string
+  ) => {
+    if (!origin || !destination || origin === destination) return;
+
+    // Set loading state for this specific transit calculation
+    setIsLoadingTransit((prev) => ({ ...prev, [transitKey]: true }));
+
+    // Check if we already have this transit info and it's not too old (less than 15 minutes)
+    const existingInfo = transitInfo[transitKey];
+    const now = Date.now();
+    const cacheTime = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+    if (
+      existingInfo &&
+      existingInfo.driving &&
+      existingInfo._timestamp &&
+      now - existingInfo._timestamp < cacheTime
+    ) {
+      // Cache hit, use existing data
+      setIsLoadingTransit((prev) => ({ ...prev, [transitKey]: false }));
+      return;
+    }
+
+    try {
+      // We'll use a local API endpoint to proxy our request to Google's Distance Matrix API
+      // In a real application, you would create an API route to handle this
+      // For this example, we'll simulate the API call with mock data
+
+      // In a real implementation, you'd make this API call:
+      /*
+      const response = await fetch('/api/distance-matrix', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          origins: [origin],
+          destinations: [destination],
+          modes: ['driving', 'walking', 'bicycling', 'transit']
+        }),
+      });
+      const data = await response.json();
+      */
+
+      // For now, let's simulate a response with mock data
+      // This would normally come from the Google Distance Matrix API
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate API delay
+
+      const mockDistance = Math.floor(Math.random() * 20) + 1; // 1-20 km
+      const mockDrivingTime = Math.floor(
+        mockDistance * 60 * (0.8 + Math.random() * 0.4)
+      ); // ~60 sec per km with some variation
+      const mockWalkingTime = mockDrivingTime * (12 + Math.random() * 4); // 12-16x driving time
+      const mockBikingTime = mockDrivingTime * (3 + Math.random() * 2); // 3-5x driving time
+      const mockTransitTime = mockDrivingTime * (1.5 + Math.random()); // 1.5-2.5x driving time
+
+      const formatDistanceString = (dist: number) => `${dist.toFixed(1)} km`;
+      const formatDurationString = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return hours > 0 ? `${hours}h ${minutes}min` : `${minutes} min`;
+      };
+
+      const newTransitInfo: TransitInfo = {
+        origin,
+        destination,
+        driving: {
+          distance: formatDistanceString(mockDistance),
+          duration: formatDurationString(mockDrivingTime),
+          durationValue: mockDrivingTime,
+        },
+        walking: {
+          distance: formatDistanceString(mockDistance),
+          duration: formatDurationString(mockWalkingTime),
+          durationValue: mockWalkingTime,
+        },
+        bicycling: {
+          distance: formatDistanceString(mockDistance),
+          duration: formatDurationString(mockBikingTime),
+          durationValue: mockBikingTime,
+        },
+        transit: {
+          distance: formatDistanceString(mockDistance),
+          duration: formatDurationString(mockTransitTime),
+          durationValue: mockTransitTime,
+        },
+        _timestamp: now,
+      };
+
+      setTransitInfo((prev) => ({ ...prev, [transitKey]: newTransitInfo }));
+    } catch (error) {
+      console.error("Error calculating transit time:", error);
+    } finally {
+      setIsLoadingTransit((prev) => ({ ...prev, [transitKey]: false }));
+    }
+  };
+
+  // Add this effect to calculate transit times when activities change
+  useEffect(() => {
+    if (!trip || !selectedDay) return;
+
+    const activities = trip.activities[selectedDay] || [];
+    if (activities.length <= 1) return;
+
+    // Calculate transit times between consecutive activities
+    for (let i = 0; i < activities.length - 1; i++) {
+      const origin = activities[i].location;
+      const destination = activities[i + 1].location;
+      const transitKey = `${activities[i].id}_${activities[i + 1].id}`;
+
+      calculateTransit(origin, destination, transitKey);
+    }
+  }, [trip, selectedDay]);
+
+  // Add the TransitRow component
+  function TransitRow({
+    originActivity,
+    destinationActivity,
+  }: {
+    originActivity: any;
+    destinationActivity: any;
+  }) {
+    const transitKey = `${originActivity.id}_${destinationActivity.id}`;
+    const info = transitInfo[transitKey];
+    const isLoading = isLoadingTransit[transitKey];
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [selectedMode, setSelectedMode] = useState<
+      "walking" | "bicycling" | "driving" | "transit"
+    >(info?.selectedMode || "driving");
+
+    // Initialize transit info if needed
+    useEffect(() => {
+      if (!info && !isLoading) {
+        // If we don't have info yet and not loading, calculate it
+        calculateTransit(
+          originActivity.location,
+          destinationActivity.location,
+          transitKey
+        );
+      }
+    }, [
+      info,
+      isLoading,
+      originActivity.location,
+      destinationActivity.location,
+      transitKey,
+    ]);
+
+    // Update local selected mode when dialog opens
+    useEffect(() => {
+      if (isDialogOpen && info) {
+        setSelectedMode(info.selectedMode || "driving");
+      }
+    }, [isDialogOpen, info]);
+
+    // Handle confirming the selected transportation mode
+    const handleConfirm = () => {
+      if (info) {
+        // Update the transit info with the selected mode
+        setTransitInfo((prev) => ({
+          ...prev,
+          [transitKey]: {
+            ...prev[transitKey],
+            selectedMode: selectedMode,
+          },
+        }));
+      }
+      setIsDialogOpen(false);
+    };
+
+    // Get current mode data to display in the transit row
+    const getCurrentModeData = () => {
+      if (!info) return null;
+
+      switch (info.selectedMode || "driving") {
+        case "walking":
+          return {
+            icon: <User className="h-4 w-4 text-blue-500 dark:text-blue-300" />,
+            distance: info.walking?.distance || "N/A",
+            duration: info.walking?.duration || "N/A",
+          };
+        case "bicycling":
+          return {
+            icon: <Bike className="h-4 w-4 text-blue-500 dark:text-blue-300" />,
+            distance: info.bicycling?.distance || "N/A",
+            duration: info.bicycling?.duration || "N/A",
+          };
+        case "transit":
+          return {
+            icon: <Bus className="h-4 w-4 text-blue-500 dark:text-blue-300" />,
+            distance: info.transit?.distance || "N/A",
+            duration: info.transit?.duration || "N/A",
+          };
+        default:
+          return {
+            icon: <Car className="h-4 w-4 text-blue-500 dark:text-blue-300" />,
+            distance: info.driving?.distance || "N/A",
+            duration: info.driving?.duration || "N/A",
+          };
+      }
+    };
+
+    const modeData = getCurrentModeData();
+
+    return (
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <div className="flex items-center justify-between px-6 py-2 mx-2 my-1  dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <div className="flex items-center">
+              <div className="p-1.5 bg-blue-100 dark:bg-blue-900 rounded-full mr-3">
+                {isLoading ? (
+                  <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-full"></div>
+                ) : modeData ? (
+                  modeData.icon
+                ) : (
+                  <Car className="h-4 w-4 text-blue-500 dark:text-blue-300" />
+                )}
+              </div>
+              {isLoading ? (
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
+              ) : info ? (
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  {modeData?.distance}
+                </span>
+              ) : (
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Calculating...
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center">
+              {isLoading ? (
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mr-2"></div>
+              ) : info ? (
+                <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">
+                  {modeData?.duration}
+                </span>
+              ) : (
+                <span className="text-sm text-gray-600 dark:text-gray-300 mr-2">
+                  --
+                </span>
+              )}
+              <ArrowRight className="h-4 w-4 text-gray-400" />
+            </div>
+          </div>
+        </DialogTrigger>
+
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle className="sr-only">
+            Transportation options from {originActivity.title} to{" "}
+            {destinationActivity.title}
+          </DialogTitle>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between text-sm px-2">
+              <div>
+                <div className="font-semibold">{originActivity.title}</div>
+                <div className="text-gray-500 text-xs">
+                  {originActivity.location}
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-gray-400 mx-2" />
+              <div>
+                <div className="font-semibold">{destinationActivity.title}</div>
+                <div className="text-gray-500 text-xs">
+                  {destinationActivity.location}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+            <div className="space-y-2 px-2">
+              <h3 className="text-lg font-semibold mb-4">
+                Select Transportation
+              </h3>
+
+              {/* Walking option */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer 
+                  ${
+                    selectedMode === "walking"
+                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                      : isLoading
+                      ? "bg-gray-100 dark:bg-gray-800"
+                      : "bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                onClick={() => setSelectedMode("walking")}
+              >
+                <div className="flex items-center">
+                  <div
+                    className={`p-2 rounded-full mr-3 ${
+                      selectedMode === "walking"
+                        ? "bg-blue-100 dark:bg-blue-800"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  >
+                    <User
+                      className={`h-5 w-5 ${
+                        selectedMode === "walking"
+                          ? "text-blue-500 dark:text-blue-300"
+                          : "text-gray-700 dark:text-gray-300"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <div className="font-medium">Walking</div>
+                    {isLoading ? (
+                      <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1"></div>
+                    ) : info?.walking ? (
+                      <div className="text-xs text-gray-500">
+                        {info.walking.distance}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Calculating...
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {isLoading ? (
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
+                  ) : info?.walking ? (
+                    <div className="font-medium">{info.walking.duration}</div>
+                  ) : (
+                    <div className="font-medium">--</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Biking option */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer 
+                  ${
+                    selectedMode === "bicycling"
+                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                      : isLoading
+                      ? "bg-gray-100 dark:bg-gray-800"
+                      : "bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                onClick={() => setSelectedMode("bicycling")}
+              >
+                <div className="flex items-center">
+                  <div
+                    className={`p-2 rounded-full mr-3 ${
+                      selectedMode === "bicycling"
+                        ? "bg-blue-100 dark:bg-blue-800"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  >
+                    <Bike
+                      className={`h-5 w-5 ${
+                        selectedMode === "bicycling"
+                          ? "text-blue-500 dark:text-blue-300"
+                          : "text-gray-700 dark:text-gray-300"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <div className="font-medium">Biking</div>
+                    {isLoading ? (
+                      <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1"></div>
+                    ) : info?.bicycling ? (
+                      <div className="text-xs text-gray-500">
+                        {info.bicycling.distance}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Calculating...
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {isLoading ? (
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
+                  ) : info?.bicycling ? (
+                    <div className="font-medium">{info.bicycling.duration}</div>
+                  ) : (
+                    <div className="font-medium">--</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Driving option */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer 
+                  ${
+                    selectedMode === "driving"
+                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                      : isLoading
+                      ? "bg-gray-100 dark:bg-gray-800"
+                      : "bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                onClick={() => setSelectedMode("driving")}
+              >
+                <div className="flex items-center">
+                  <div
+                    className={`p-2 rounded-full mr-3 ${
+                      selectedMode === "driving"
+                        ? "bg-blue-100 dark:bg-blue-800"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  >
+                    <Car
+                      className={`h-5 w-5 ${
+                        selectedMode === "driving"
+                          ? "text-blue-500 dark:text-blue-300"
+                          : "text-gray-700 dark:text-gray-300"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <div className="font-medium">Driving</div>
+                    {isLoading ? (
+                      <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1"></div>
+                    ) : info?.driving ? (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {info.driving.distance}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        计算中...
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {isLoading ? (
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
+                  ) : info?.driving ? (
+                    <div className="font-medium">{info.driving.duration}</div>
+                  ) : (
+                    <div className="font-medium">--</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Public transit option */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer 
+                  ${
+                    selectedMode === "transit"
+                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                      : isLoading
+                      ? "bg-gray-100 dark:bg-gray-800"
+                      : "bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  }`}
+                onClick={() => setSelectedMode("transit")}
+              >
+                <div className="flex items-center">
+                  <div
+                    className={`p-2 rounded-full mr-3 ${
+                      selectedMode === "transit"
+                        ? "bg-blue-100 dark:bg-blue-800"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  >
+                    <Bus
+                      className={`h-5 w-5 ${
+                        selectedMode === "transit"
+                          ? "text-blue-500 dark:text-blue-300"
+                          : "text-gray-700 dark:text-gray-300"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <div className="font-medium">Public Transit</div>
+                    {isLoading ? (
+                      <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 animate-pulse rounded mt-1"></div>
+                    ) : info?.transit ? (
+                      <div className="text-xs text-gray-500">
+                        {info.transit.distance}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500">
+                        Calculating...
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {isLoading ? (
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 animate-pulse rounded"></div>
+                  ) : info?.transit ? (
+                    <div className="font-medium">{info.transit.duration}</div>
+                  ) : (
+                    <div className="font-medium">--</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <Button className="w-32" onClick={handleConfirm}>
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   if (!trip) return null;
 
   // Get the activities for the selected day
@@ -1104,11 +1660,19 @@ export default function TripOverview() {
                         strategy={verticalListSortingStrategy}
                       >
                         {dayActivities.map((activity: any, index: number) => (
-                          <SortableActivityCard
-                            key={activity.id}
-                            activity={activity}
-                            index={index}
-                          />
+                          <div key={activity.id}>
+                            <SortableActivityCard
+                              activity={activity}
+                              index={index}
+                            />
+                            {/* Add transit info row after each activity except the last one */}
+                            {index < dayActivities.length - 1 && (
+                              <TransitRow
+                                originActivity={activity}
+                                destinationActivity={dayActivities[index + 1]}
+                              />
+                            )}
+                          </div>
                         ))}
                       </SortableContext>
                     </DndContext>
