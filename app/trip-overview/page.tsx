@@ -1783,7 +1783,7 @@ export default function TripOverview() {
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
       {/* Navigation Bar */}
       <header className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+        <div className="mx-auto flex items-center justify-between">
           <div className="flex items-center">
             <Link href="/" className="mr-4">
               <Button
@@ -1906,104 +1906,112 @@ export default function TripOverview() {
                 {trip.location}
               </p>
             </div>
-            <ScrollArea className="flex-1">
-              <div className="p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">
-                    {trip.days.find((day) => day.id === selectedDay)?.title} -{" "}
-                    {trip.days.find((day) => day.id === selectedDay)?.date}
-                  </h3>
-                  {isLoaded && dayActivities.length > 1 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center gap-1"
-                      onClick={toggleDirections}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-4 w-4"
+            <div className="flex flex-col h-[calc(100%-66px)] relative">
+              <ScrollArea className="flex-1">
+                <div className="p-4 pb-20">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold">
+                      {trip.days.find((day) => day.id === selectedDay)?.title} -{" "}
+                      {trip.days.find((day) => day.id === selectedDay)?.date}
+                    </h3>
+                    {isLoaded && dayActivities.length > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1"
+                        onClick={toggleDirections}
                       >
-                        <path d="M12 19V5" />
-                        <path d="M5 12h14" />
-                        <path d="m12 5-3 3 3-3 3 3-3-3z" />
-                        <path d="m12 19 3-3-3 3-3-3 3 3z" />
-                      </svg>
-                      {showDirections ? "Hide Route" : "Show Route"}
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-4 ">
-                  {dayActivities.length > 0 ? (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={dayActivities.map(
-                          (activity: any) => activity.id
-                        )}
-                        strategy={verticalListSortingStrategy}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4"
+                        >
+                          <path d="M12 19V5" />
+                          <path d="M5 12h14" />
+                          <path d="m12 5-3 3 3-3 3 3-3-3z" />
+                          <path d="m12 19 3-3-3 3-3-3 3 3z" />
+                        </svg>
+                        {showDirections ? "Hide Route" : "Show Route"}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-4 ">
+                    {dayActivities.length > 0 ? (
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
                       >
-                        {dayActivities.map((activity: any, index: number) => (
-                          <div key={activity.id}>
-                            <SortableActivityCard
-                              activity={activity}
-                              index={index}
-                            />
-                            {/* Add transit info row after each activity except the last one */}
-                            {index < dayActivities.length - 1 &&
-                              // Only show transit info if neither the origin nor destination is a custom activity
-                              (activity.location !== "none" &&
-                              dayActivities[index + 1].location !== "none" ? (
-                                <TransitRow
-                                  originActivity={activity}
-                                  destinationActivity={dayActivities[index + 1]}
-                                />
-                              ) : (
-                                // Show a simplified divider for custom activities
-                                <div className="flex items-center justify-center py-2 mx-2 my-1">
-                                  <div className="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
-                                </div>
-                              ))}
-                          </div>
-                        ))}
-                      </SortableContext>
-                    </DndContext>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="mb-4 rounded-full bg-muted/50 p-3">
-                        <Calendar className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                        <SortableContext
+                          items={dayActivities.map(
+                            (activity: any) => activity.id
+                          )}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {dayActivities.map((activity: any, index: number) => (
+                            <div key={activity.id}>
+                              <SortableActivityCard
+                                activity={activity}
+                                index={index}
+                              />
+                              {/* Add transit info row after each activity except the last one */}
+                              {index < dayActivities.length - 1 &&
+                                // Only show transit info if neither the origin nor destination is a custom activity
+                                (activity.location !== "none" &&
+                                dayActivities[index + 1].location !== "none" ? (
+                                  <TransitRow
+                                    originActivity={activity}
+                                    destinationActivity={
+                                      dayActivities[index + 1]
+                                    }
+                                  />
+                                ) : (
+                                  // Show a simplified divider for custom activities
+                                  <div className="flex items-center justify-center py-2 mx-2 my-1">
+                                    <div className="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                                  </div>
+                                ))}
+                            </div>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <div className="mb-4 rounded-full bg-muted/50 p-3">
+                          <Calendar className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                        </div>
+                        <h3 className="mb-1 text-lg font-medium">
+                          No activities yet
+                        </h3>
+                        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                          Start planning your day by adding activities from the
+                          map panel
+                        </p>
                       </div>
-                      <h3 className="mb-1 text-lg font-medium">
-                        No activities yet
-                      </h3>
-                      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
-                        Start planning your day by adding activities from the
-                        map panel
-                      </p>
-                    </div>
-                  )}
-                  <Button
-                    variant="outline"
-                    className="w-full border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
-                    onClick={handleAddActivity}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Activity
-                  </Button>
+                    )}
+                  </div>
                 </div>
+              </ScrollArea>
+
+              {/* Fixed Add Activity Button */}
+              <div className="absolute bottom-5 left-0 right-0 p-4 bg-white dark:bg-black border-t border-gray-200 dark:border-gray-700 shadow-md z-10">
+                <Button
+                  variant="outline"
+                  className="w-full border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+                  onClick={handleAddActivity}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Activity
+                </Button>
               </div>
-            </ScrollArea>
+            </div>
           </div>
 
           {/* Middle Panel - Category Content (Only shown when a category is selected) */}
