@@ -295,9 +295,12 @@ interface Activity {
   time: string;
   title: string;
   description: string;
-  location: string;
+  location?: string;
   category: string;
   position?: ActivityPosition;
+  website?: string;
+  phoneNumber?: string;
+  locationPosition?: ActivityPosition;
 }
 
 interface TransitInfo {
@@ -566,7 +569,7 @@ export default function TripOverview() {
     } else {
       setSelectedCategory(category);
       setSearchQuery(""); // Clear search query
-      setIsAddingActivity(false); // Exit add activity mode
+      // Do not set isAddingActivity to false here, so the UI remains visible
     }
   };
 
@@ -626,6 +629,8 @@ export default function TripOverview() {
     placeId: string;
     placeTypes?: string[];
     isCustomActivity?: boolean;
+    website?: string;
+    phoneNumber?: string;
   } | null>(null);
 
   // Add these new state variables for custom autocomplete
@@ -702,7 +707,14 @@ export default function TripOverview() {
     placesService.current.getDetails(
       {
         placeId: prediction.place_id,
-        fields: ["name", "geometry", "formatted_address", "types"], // Added types field
+        fields: [
+          "name",
+          "geometry",
+          "formatted_address",
+          "types",
+          "website",
+          "formatted_phone_number",
+        ],
       },
       (place, status) => {
         if (
@@ -725,7 +737,9 @@ export default function TripOverview() {
             address: place.formatted_address || "",
             name: place.name || "",
             placeId: place.place_id || "",
-            placeTypes: place.types || [], // Store the place types
+            placeTypes: place.types || [],
+            website: place.website || "",
+            phoneNumber: place.formatted_phone_number || "",
           });
 
           // Initialize the activity name with the location name
@@ -733,6 +747,11 @@ export default function TripOverview() {
 
           // Open the middle panel to show details
           setSelectedCategory("searchResult");
+
+          // If we were editing a location, exit location editing mode
+          if (editingLocation) {
+            setEditingLocation(false);
+          }
         }
       }
     );
@@ -740,6 +759,7 @@ export default function TripOverview() {
 
   // Add these new state variables below the other state variables declarations
   const [editMode, setEditMode] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(false);
   const [activityTime, setActivityTime] = useState("");
   const [activityDescription, setActivityDescription] = useState("");
 
@@ -798,11 +818,14 @@ export default function TripOverview() {
       name: activity.title,
       placeId: `activity-${activity.id}`,
       placeTypes: [activity.category.toLowerCase()],
+      website: activity.website || "",
+      phoneNumber: activity.phoneNumber || "",
     });
 
     // Set the edit mode
     setSelectedCategory("searchResult");
     setEditMode(true);
+    setEditingLocation(false);
 
     // Store the activity ID for updating
     setEditingActivityId(activity.id);
@@ -839,6 +862,9 @@ export default function TripOverview() {
         : "Place",
       // Store the position if we have it from searchedLocation
       position: searchedLocation ? searchedLocation.position : undefined,
+      // Store website and phone number if available
+      website: searchedLocation?.website || "",
+      phoneNumber: searchedLocation?.phoneNumber || "",
     };
 
     // Create a copy of the current trip
@@ -876,6 +902,7 @@ export default function TripOverview() {
     setActivityTime("");
     setActivityDescription("");
     setEditMode(false);
+    setEditingLocation(false);
     setEditingActivityId(null);
   };
 
@@ -1634,9 +1661,12 @@ export default function TripOverview() {
       return;
     }
 
-    // Filter out custom activities (those with location="none")
+    // Filter out custom activities (those with location="none" or empty location)
     const activities = allActivities.filter(
-      (activity: any) => activity.location !== "none"
+      (activity: any) =>
+        activity.location &&
+        activity.location !== "none" &&
+        activity.location !== ""
     );
 
     // Check if we still have enough activities after filtering
@@ -1704,6 +1734,50 @@ export default function TripOverview() {
   // Get the activities for the selected day
   const dayActivities =
     trip.activities[selectedDay as keyof typeof trip.activities] || [];
+
+  // Function to toggle location editing mode
+  const toggleLocationEditing = () => {
+    setEditingLocation(!editingLocation);
+
+    // When enabling location editing, focus the search input after state updates
+    if (!editingLocation) {
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }, 100);
+    }
+  };
+
+  const handleLocationDelete = () => {
+    if (editingActivityId) {
+      const activityToUpdate = dayActivities.find(
+        (activity) => activity.id === editingActivityId
+      );
+      if (activityToUpdate) {
+        // Create a new object with an empty location string instead of deleting it
+        const updatedActivity = {
+          ...activityToUpdate,
+          location: "", // Set to empty string instead of deleting
+          position: undefined, // Clear the position without deleting the property
+        };
+
+        // Update the activity in the dayActivities array
+        const updatedActivities = dayActivities.map((activity) =>
+          activity.id === editingActivityId ? updatedActivity : activity
+        );
+
+        // Update the trip object with the modified activities
+        const updatedTrip = { ...trip };
+        updatedTrip.activities[selectedDay as keyof typeof trip.activities] =
+          updatedActivities;
+        setTrip(updatedTrip);
+      }
+    }
+
+    // Reset location editing mode
+    setEditingLocation(false);
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
@@ -1936,127 +2010,137 @@ export default function TripOverview() {
           {showMiddlePanel && (
             <div className="w-[580px] border-r border-gray-200 dark:border-gray-700 flex flex-col">
               <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-                {/* Search Bar */}
-                <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
-                  <div className="flex items-center p-2">
-                    <Search className="ml-2 h-5 w-5 text-gray-500" />
-                    <div className="flex-1 relative">
-                      <Input
-                        placeholder={getSearchPlaceholder()}
-                        className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
-                        value={searchQuery}
-                        onChange={handleSearchInputChange}
-                        onFocus={() =>
-                          searchQuery.length > 2 && setShowPredictions(true)
-                        }
-                        ref={searchInputRef}
-                      />
+                {/* Search Bar - Only show if adding activity or editing location */}
+                {(isAddingActivity || editingLocation) && (
+                  <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
+                    <div className="flex items-center p-2">
+                      <Search className="ml-2 h-5 w-5 text-gray-500" />
+                      <div className="flex-1 relative">
+                        <Input
+                          placeholder={getSearchPlaceholder()}
+                          className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
+                          value={searchQuery}
+                          onChange={handleSearchInputChange}
+                          onFocus={() =>
+                            searchQuery.length > 2 && setShowPredictions(true)
+                          }
+                          ref={searchInputRef}
+                        />
 
-                      {showPredictions && (
-                        <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
-                          <div
-                            className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
-                            onClick={() => handleSelectPrediction(null, true)}
-                          >
-                            <span>{searchQuery}</span>
-                            <span className="text-gray-500 text-sm">
-                              custom
-                            </span>
-                          </div>
-
-                          {predictions.map((prediction) => (
+                        {showPredictions && (
+                          <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
                             <div
-                              key={prediction.place_id}
-                              className="p-2 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => handleSelectPrediction(prediction)}
+                              className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
+                              onClick={() => handleSelectPrediction(null, true)}
                             >
-                              <div className="flex items-center">
-                                <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                                <span>{prediction.description}</span>
-                              </div>
+                              <span>{searchQuery}</span>
+                              <span className="text-gray-500 text-sm">
+                                custom
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      )}
+
+                            {predictions.map((prediction) => (
+                              <div
+                                key={prediction.place_id}
+                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() =>
+                                  handleSelectPrediction(prediction)
+                                }
+                              >
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                                  <span>{prediction.description}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-500 ml-auto"
+                        onClick={() => {
+                          if (editingLocation) {
+                            setEditingLocation(false);
+                          } else {
+                            closeMiddlePanel();
+                          }
+                          setShowPredictions(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
+                  </div>
+                )}
+
+                {/* Category Buttons - Only show if adding activity */}
+                {isAddingActivity && !editMode && (
+                  <div className="flex flex-wrap gap-1 mb-4">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-gray-500 ml-auto"
-                      onClick={() => {
-                        closeMiddlePanel();
-                        setShowPredictions(false);
-                      }}
+                      variant={
+                        selectedCategory === "restaurants"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("restaurants")}
                     >
-                      <X className="h-4 w-4" />
+                      <Utensils className="mr-2 h-4 w-4" />
+                      Restaurants
+                    </Button>
+                    <Button
+                      variant={
+                        selectedCategory === "hotels" ? "default" : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("hotels")}
+                    >
+                      <Hotel className="mr-2 h-4 w-4" />
+                      Hotels
+                    </Button>
+                    <Button
+                      variant={
+                        selectedCategory === "activities"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("activities")}
+                    >
+                      <Landmark className="mr-2 h-4 w-4" />
+                      Things to do
+                    </Button>
+                    <Button
+                      variant={
+                        selectedCategory === "museums" ? "default" : "secondary"
+                      }
+                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      onClick={() => handleCategorySelect("museums")}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mr-2 h-4 w-4"
+                      >
+                        <path d="M2 20h20" />
+                        <path d="M5 4v16" />
+                        <path d="M19 4v16" />
+                        <path d="M5 4h14" />
+                        <path d="M5 12h14" />
+                      </svg>
+                      Museums
                     </Button>
                   </div>
-                </div>
-
-                {/* Category Buttons */}
-                <div className="flex flex-wrap gap-1 mb-4">
-                  <Button
-                    variant={
-                      selectedCategory === "restaurants"
-                        ? "default"
-                        : "secondary"
-                    }
-                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                    onClick={() => handleCategorySelect("restaurants")}
-                  >
-                    <Utensils className="mr-2 h-4 w-4" />
-                    Restaurants
-                  </Button>
-                  <Button
-                    variant={
-                      selectedCategory === "hotels" ? "default" : "secondary"
-                    }
-                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                    onClick={() => handleCategorySelect("hotels")}
-                  >
-                    <Hotel className="mr-2 h-4 w-4" />
-                    Hotels
-                  </Button>
-                  <Button
-                    variant={
-                      selectedCategory === "activities"
-                        ? "default"
-                        : "secondary"
-                    }
-                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                    onClick={() => handleCategorySelect("activities")}
-                  >
-                    <Landmark className="mr-2 h-4 w-4" />
-                    Things to do
-                  </Button>
-                  <Button
-                    variant={
-                      selectedCategory === "museums" ? "default" : "secondary"
-                    }
-                    className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
-                    onClick={() => handleCategorySelect("museums")}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="mr-2 h-4 w-4"
-                    >
-                      <path d="M2 20h20" />
-                      <path d="M5 4v16" />
-                      <path d="M19 4v16" />
-                      <path d="M5 4h14" />
-                      <path d="M5 12h14" />
-                    </svg>
-                    Museums
-                  </Button>
-                </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold capitalize">
@@ -2189,12 +2273,55 @@ export default function TripOverview() {
                       )}
 
                       <div className="space-y-3 mb-4">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-5 w-5 text-gray-500" />
-                          <span className="text-sm">
-                            {searchedLocation.address}
-                          </span>
-                        </div>
+                        {editMode ? (
+                          <div
+                            className={`flex items-center gap-2 p-2 border rounded-md ${
+                              editingLocation
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            } cursor-pointer transition-colors`}
+                            onClick={toggleLocationEditing}
+                          >
+                            <MapPin className="h-5 w-5 text-gray-500" />
+                            <div className="flex-1">
+                              <span className="text-sm">
+                                {searchedLocation.address !== "none"
+                                  ? searchedLocation.address
+                                  : "No location - click to set"}
+                              </span>
+                              {editingLocation && (
+                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                  Search above to change location
+                                </p>
+                              )}
+                            </div>
+                            {!editingLocation && (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M9 5l7 7-7 7"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-gray-500" />
+                            <span className="text-sm">
+                              {searchedLocation.address !== "none"
+                                ? searchedLocation.address
+                                : "No location specified"}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {editMode ? (
@@ -2251,24 +2378,98 @@ export default function TripOverview() {
                         </div>
                       )}
 
-                      <div className="flex gap-4 mb-6">
-                        <Button
-                          className="flex-1"
-                          onClick={handleAddToItinerary}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          {editingActivityId
-                            ? "Update Activity"
-                            : "Add to Itinerary"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={saveLocation}
-                        >
-                          <Heart className="mr-2 h-4 w-4" />
-                          Save {getPlaceTypeName(searchedLocation?.placeTypes)}
-                        </Button>
+                      {!editMode && (
+                        <div className="flex gap-4 mb-6">
+                          <Button
+                            className="flex-1"
+                            onClick={handleAddToItinerary}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            {editingActivityId
+                              ? "Update Activity"
+                              : "Add to Itinerary"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={saveLocation}
+                          >
+                            <Heart className="mr-2 h-4 w-4" />
+                            Save{" "}
+                            {getPlaceTypeName(searchedLocation?.placeTypes)}
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Additional information section */}
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-4">
+                        <h3 className="text-sm font-semibold mb-3">
+                          Additional Information
+                        </h3>
+
+                        {/* Website */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-5 w-5 text-gray-500"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                          </svg>
+                          {searchedLocation?.website ? (
+                            <a
+                              href={searchedLocation.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-[300px]"
+                            >
+                              {searchedLocation.website}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-gray-500">
+                              No website available
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Phone Number */}
+                        <div className="flex items-center gap-2">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-5 w-5 text-gray-500"
+                          >
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                          </svg>
+                          {searchedLocation?.phoneNumber ? (
+                            <a
+                              href={`tel:${searchedLocation.phoneNumber}`}
+                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              {searchedLocation.phoneNumber}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-gray-500">
+                              No phone number available
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : (
