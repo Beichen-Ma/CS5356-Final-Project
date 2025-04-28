@@ -491,7 +491,38 @@ export default function TripOverview() {
     const dayActivities =
       trip.activities[selectedDay as keyof typeof trip.activities] || [];
 
-    return dayActivities.map((activity: any, index) => {
+    // Always filter out custom activities (those with location="none")
+    const validActivities = dayActivities.filter(
+      (activity: any) => activity.location !== "none"
+    );
+
+    // If showing directions, renumber the markers sequentially
+    if (showDirections) {
+      // Map them to markers with consecutive numbers
+      return validActivities.map((activity: any, index) => {
+        // Use stored position if available, otherwise create a position based on index
+        const position = activity.position || {
+          lat: mapCenter.lat + ((index % 5) * 0.01 - 0.02),
+          lng: mapCenter.lng + (Math.floor(index / 5) * 0.01 - 0.02),
+        };
+
+        return {
+          id: activity.id,
+          title: activity.title,
+          location: activity.location,
+          position: position,
+          index: index + 1, // Consecutive numbers starting from 1
+        };
+      });
+    }
+
+    // Regular case: return all valid activities with their original indices
+    return validActivities.map((activity: any, index) => {
+      // Find the original index of this activity in the full list
+      const originalIndex = dayActivities.findIndex(
+        (a: any) => a.id === activity.id
+      );
+
       // Use stored position if available, otherwise create a position based on index
       const position = activity.position || {
         lat: mapCenter.lat + ((index % 5) * 0.01 - 0.02),
@@ -503,7 +534,7 @@ export default function TripOverview() {
         title: activity.title,
         location: activity.location,
         position: position,
-        index: index + 1,
+        index: originalIndex + 1, // Keep the original numbering from the full list
       };
     });
   };
@@ -594,6 +625,7 @@ export default function TripOverview() {
     name: string;
     placeId: string;
     placeTypes?: string[];
+    isCustomActivity?: boolean;
   } | null>(null);
 
   // Add these new state variables for custom autocomplete
@@ -651,10 +683,11 @@ export default function TripOverview() {
       // For custom selection, we'll just use the text as the name
       setSearchedLocation({
         position: mapCenter, // Default to current map center
-        address: searchQuery,
+        address: "none", // Set address to "none" for custom activities
         name: searchQuery,
         placeId: "custom-location",
         placeTypes: ["custom"], // Default type for custom locations
+        isCustomActivity: true, // Flag to indicate this is a custom activity
       });
 
       // Initialize the activity name with the location name
@@ -888,6 +921,14 @@ export default function TripOverview() {
   const [selectedMarkerPosition, setSelectedMarkerPosition] =
     useState<google.maps.LatLngLiteral | null>(null);
 
+  // Add a state to track whether marker was selected from map or activity list
+  const [markerSelectedFromMap, setMarkerSelectedFromMap] = useState(false);
+
+  // Add this state variable with the other state variables
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(
+    null
+  );
+
   // Create a separate SortableActivityCard component to use with the sortable context
   function SortableActivityCard({
     activity,
@@ -916,13 +957,33 @@ export default function TripOverview() {
         return;
       }
 
+      // Toggle selection - deselect if clicking the same card again
+      if (selectedActivityId === activity.id) {
+        // Deselect this activity
+        setSelectedActivityId(null);
+        setSelectedMarker(null);
+        setSelectedMarkerPosition(null);
+
+        // If we're showing directions, fit the map to the route bounds when deselecting
+        if (showDirections && directionsResponse && mapRef.current) {
+          const bounds = directionsResponse.routes[0]?.bounds;
+          if (bounds) {
+            mapRef.current.fitBounds(bounds);
+          }
+        }
+        return;
+      }
+
+      // Set this activity as selected
+      setSelectedActivityId(activity.id);
+
       // Find the marker position for this activity
       const position = activity.position || {
         lat: mapCenter.lat + ((index % 5) * 0.01 - 0.02),
         lng: mapCenter.lng + (Math.floor(index / 5) * 0.01 - 0.02),
       };
 
-      // Store the position for the InfoWindow
+      // Store the position for highlighting the marker
       setSelectedMarkerPosition(position);
 
       // Center the map on this position
@@ -931,12 +992,18 @@ export default function TripOverview() {
         mapRef.current.setZoom(15);
       }
 
-      // Select the marker to show its info window
+      // Set the selected marker for highlighting, but don't show info window
       setSelectedMarker({
         id: activity.id,
         title: activity.title,
       });
+
+      // Set flag to indicate selection is from activity list, not map click
+      setMarkerSelectedFromMap(false);
     };
+
+    // Check if this activity is currently selected
+    const isSelected = selectedActivityId === activity.id;
 
     return (
       <Card
@@ -944,7 +1011,11 @@ export default function TripOverview() {
         ref={setNodeRef}
         style={style}
         onClick={handleCardClick}
-        className="relative border-gray-200 dark:border-gray-700 bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer text-left"
+        className={`relative bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer text-left ${
+          isSelected
+            ? "border-2 border-red-500"
+            : "border border-gray-200 dark:border-gray-700"
+        }`}
       >
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between w-full">
@@ -952,9 +1023,13 @@ export default function TripOverview() {
               <div
                 {...attributes}
                 {...listeners}
-                className="absolute -left-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center cursor-grab active:cursor-grabbing grip-handle"
+                className="absolute -left-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center cursor-grab active:cursor-grabbing grip-handle group"
+                data-tooltip="Drag to reorder"
               >
                 <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <div className="absolute left-10 -top-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-nowrap">
+                  Drag to reorder
+                </div>
               </div>
               <div className="ml-4">
                 <CardTitle className="text-base text-left">
@@ -1004,7 +1079,11 @@ export default function TripOverview() {
           </div>
           <Badge
             variant="outline"
-            className="ml-auto border-gray-200 dark:border-gray-700"
+            className={`ml-auto ${
+              isSelected
+                ? "border-red-500"
+                : "border-gray-200 dark:border-gray-700"
+            }`}
           >
             {activity.category}
           </Badge>
@@ -1049,70 +1128,67 @@ export default function TripOverview() {
     }
 
     try {
-      // We'll use a local API endpoint to proxy our request to Google's Distance Matrix API
-      // In a real application, you would create an API route to handle this
-      // For this example, we'll simulate the API call with mock data
+      // Use Google Maps Distance Matrix Service directly
+      const distanceMatrixService = new google.maps.DistanceMatrixService();
 
-      // In a real implementation, you'd make this API call:
-      /*
-      const response = await fetch('/api/distance-matrix', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          origins: [origin],
-          destinations: [destination],
-          modes: ['driving', 'walking', 'bicycling', 'transit']
-        }),
-      });
-      const data = await response.json();
-      */
-
-      // For now, let's simulate a response with mock data
-      // This would normally come from the Google Distance Matrix API
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate API delay
-
-      const mockDistance = Math.floor(Math.random() * 20) + 1; // 1-20 km
-      const mockDrivingTime = Math.floor(
-        mockDistance * 60 * (0.8 + Math.random() * 0.4)
-      ); // ~60 sec per km with some variation
-      const mockWalkingTime = mockDrivingTime * (12 + Math.random() * 4); // 12-16x driving time
-      const mockBikingTime = mockDrivingTime * (3 + Math.random() * 2); // 3-5x driving time
-      const mockTransitTime = mockDrivingTime * (1.5 + Math.random()); // 1.5-2.5x driving time
-
-      const formatDistanceString = (dist: number) => `${dist.toFixed(1)} km`;
-      const formatDurationString = (seconds: number) => {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return hours > 0 ? `${hours}h ${minutes}min` : `${minutes} min`;
-      };
-
+      // Initialize the transit info object
       const newTransitInfo: TransitInfo = {
         origin,
         destination,
         driving: {
-          distance: formatDistanceString(mockDistance),
-          duration: formatDurationString(mockDrivingTime),
-          durationValue: mockDrivingTime,
-        },
-        walking: {
-          distance: formatDistanceString(mockDistance),
-          duration: formatDurationString(mockWalkingTime),
-          durationValue: mockWalkingTime,
-        },
-        bicycling: {
-          distance: formatDistanceString(mockDistance),
-          duration: formatDurationString(mockBikingTime),
-          durationValue: mockBikingTime,
-        },
-        transit: {
-          distance: formatDistanceString(mockDistance),
-          duration: formatDurationString(mockTransitTime),
-          durationValue: mockTransitTime,
+          distance: "",
+          duration: "",
+          durationValue: 0,
         },
         _timestamp: now,
       };
+
+      // Function to get distance and duration for each mode
+      const getModeData = async (mode: google.maps.TravelMode) => {
+        try {
+          const response = await distanceMatrixService.getDistanceMatrix({
+            origins: [origin],
+            destinations: [destination],
+            travelMode: mode,
+            unitSystem: google.maps.UnitSystem.METRIC,
+          });
+
+          if (
+            response.rows[0]?.elements[0]?.status === "OK" &&
+            response.rows[0]?.elements[0]?.distance &&
+            response.rows[0]?.elements[0]?.duration
+          ) {
+            const result = response.rows[0].elements[0];
+            return {
+              distance: result.distance.text,
+              duration: result.duration.text,
+              durationValue: result.duration.value, // duration in seconds
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error fetching ${mode} data:`, error);
+          return null;
+        }
+      };
+
+      // Get data for each mode of transportation
+      const drivingData = await getModeData(google.maps.TravelMode.DRIVING);
+      if (drivingData) newTransitInfo.driving = drivingData;
+
+      const walkingData = await getModeData(google.maps.TravelMode.WALKING);
+      if (walkingData) newTransitInfo.walking = walkingData;
+
+      const bicyclingData = await getModeData(google.maps.TravelMode.BICYCLING);
+      if (bicyclingData) newTransitInfo.bicycling = bicyclingData;
+
+      const transitData = await getModeData(google.maps.TravelMode.TRANSIT);
+      if (transitData) newTransitInfo.transit = transitData;
+
+      // Set default selected mode if not already set
+      if (!newTransitInfo.selectedMode) {
+        newTransitInfo.selectedMode = "driving";
+      }
 
       setTransitInfo((prev) => ({ ...prev, [transitKey]: newTransitInfo }));
     } catch (error) {
@@ -1158,6 +1234,15 @@ export default function TripOverview() {
     // Initialize transit info if needed
     useEffect(() => {
       if (!info && !isLoading) {
+        // Check if either origin or destination is a custom activity (location="none")
+        if (
+          originActivity.location === "none" ||
+          destinationActivity.location === "none"
+        ) {
+          // Skip transit calculation for custom activities
+          return;
+        }
+
         // If we don't have info yet and not loading, calculate it
         calculateTransit(
           originActivity.location,
@@ -1542,9 +1627,23 @@ export default function TripOverview() {
       return;
     }
 
-    const activities = trip.activities[selectedDay];
-    if (!activities || activities.length < 2) {
+    // Get all activities for the day
+    const allActivities = trip.activities[selectedDay];
+    if (!allActivities || allActivities.length < 2) {
       alert("Need at least two activities to show directions");
+      return;
+    }
+
+    // Filter out custom activities (those with location="none")
+    const activities = allActivities.filter(
+      (activity: any) => activity.location !== "none"
+    );
+
+    // Check if we still have enough activities after filtering
+    if (activities.length < 2) {
+      alert(
+        "Need at least two activities with valid locations to show directions"
+      );
       return;
     }
 
@@ -1788,12 +1887,20 @@ export default function TripOverview() {
                               index={index}
                             />
                             {/* Add transit info row after each activity except the last one */}
-                            {index < dayActivities.length - 1 && (
-                              <TransitRow
-                                originActivity={activity}
-                                destinationActivity={dayActivities[index + 1]}
-                              />
-                            )}
+                            {index < dayActivities.length - 1 &&
+                              // Only show transit info if neither the origin nor destination is a custom activity
+                              (activity.location !== "none" &&
+                              dayActivities[index + 1].location !== "none" ? (
+                                <TransitRow
+                                  originActivity={activity}
+                                  destinationActivity={dayActivities[index + 1]}
+                                />
+                              ) : (
+                                // Show a simplified divider for custom activities
+                                <div className="flex items-center justify-center py-2 mx-2 my-1">
+                                  <div className="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                                </div>
+                              ))}
                           </div>
                         ))}
                       </SortableContext>
@@ -2234,15 +2341,36 @@ export default function TripOverview() {
                     zoom={12}
                     onLoad={(map) => {
                       mapRef.current = map;
+
+                      // Add listener for map drag to deselect activity
+                      map.addListener("dragstart", () => {
+                        // If we had a selected activity
+                        if (selectedActivityId !== null) {
+                          setSelectedActivityId(null);
+                          if (!markerSelectedFromMap) {
+                            setSelectedMarker(null);
+                            setSelectedMarkerPosition(null);
+
+                            // If showing directions, fit to route bounds
+                            if (showDirections && directionsResponse) {
+                              const bounds =
+                                directionsResponse.routes[0]?.bounds;
+                              if (bounds) {
+                                map.fitBounds(bounds);
+                              }
+                            }
+                          }
+                        }
+                      });
                     }}
                     options={{
-                      zoomControl: false, // We have our own zoom buttons
+                      zoomControl: false,
                       mapTypeControl: false,
                       streetViewControl: false,
                       fullscreenControl: false,
                     }}
                   >
-                    {/* Render Activity Markers */}
+                    {/* Render Activity Markers - Never show markers for custom activities */}
                     {!selectedCategory &&
                       getMapMarkers().map((marker) => (
                         <Marker
@@ -2252,13 +2380,27 @@ export default function TripOverview() {
                             text: marker.index.toString(),
                             color: "white",
                             className: "font-bold",
+                            fontSize: "15px",
+                            fontWeight: "bold",
                           }}
                           icon={{
-                            url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                            url:
+                              selectedMarker && selectedMarker.id === marker.id
+                                ? "https://maps.google.com/mapfiles/ms/icons/green-dot.png" // Highlight selected marker
+                                : "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                            scaledSize:
+                              selectedMarker && selectedMarker.id === marker.id
+                                ? new google.maps.Size(52, 52) // Make selected marker larger
+                                : new google.maps.Size(38, 38), // Make default markers larger too
                           }}
-                          onClick={() => setSelectedMarker(marker)}
+                          onClick={() => {
+                            setSelectedMarker(marker);
+                            setSelectedMarkerPosition(marker.position);
+                            setMarkerSelectedFromMap(true);
+                          }}
                         />
                       ))}
+
                     {/* Render Category Markers */}
                     {selectedCategory &&
                       getCurrentCategoryData().map((item, index) => (
@@ -2276,42 +2418,61 @@ export default function TripOverview() {
                                 : selectedCategory === "activities"
                                 ? "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
                                 : "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                            scaledSize: new google.maps.Size(38, 38), // Make category markers larger too
                           }}
-                          onClick={() =>
+                          onClick={() => {
+                            const position = {
+                              lat:
+                                mapCenter.lat + (Math.random() * 0.05 - 0.025),
+                              lng:
+                                mapCenter.lng + (Math.random() * 0.05 - 0.025),
+                            };
                             setSelectedMarker({
                               id: item.id,
                               title: item.title,
-                            })
-                          }
+                            });
+                            setSelectedMarkerPosition(position);
+                            setMarkerSelectedFromMap(true);
+                          }}
                         />
                       ))}
 
                     {/* Info Window for selected marker */}
-                    {selectedMarker && selectedMarkerPosition && (
-                      <InfoWindow
-                        position={selectedMarkerPosition}
-                        onCloseClick={() => {
-                          setSelectedMarker(null);
-                          setSelectedMarkerPosition(null);
-                        }}
-                      >
-                        <div className="p-1">
-                          <p className="font-medium text-sm">
-                            {selectedMarker.title}
-                          </p>
-                        </div>
-                      </InfoWindow>
-                    )}
+                    {selectedMarker &&
+                      selectedMarkerPosition &&
+                      markerSelectedFromMap && (
+                        <InfoWindow
+                          position={selectedMarkerPosition}
+                          onCloseClick={() => {
+                            setSelectedMarker(null);
+                            setSelectedMarkerPosition(null);
+                            setMarkerSelectedFromMap(false);
+                            setSelectedActivityId(null); // Clear selected activity when closing info window
+                          }}
+                        >
+                          <div className="p-1">
+                            <p className="font-medium text-sm">
+                              {selectedMarker.title}
+                            </p>
+                          </div>
+                        </InfoWindow>
+                      )}
                     {/* Searched Location Marker */}
-                    {searchedLocation && (
+                    {searchedLocation && !searchedLocation.isCustomActivity && (
                       <Marker
                         position={searchedLocation.position}
                         animation={google.maps.Animation.DROP}
+                        icon={{
+                          url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+                          scaledSize: new google.maps.Size(38, 38),
+                        }}
                         onClick={() => {
                           setSelectedMarker({
                             id: 999, // Use a unique ID
                             title: searchedLocation.name,
                           });
+                          setSelectedMarkerPosition(searchedLocation.position);
+                          setMarkerSelectedFromMap(true);
                         }}
                       />
                     )}
@@ -2320,14 +2481,61 @@ export default function TripOverview() {
                         directions={directionsResponse}
                         options={{
                           polylineOptions: {
-                            strokeColor: "#4285F4",
+                            strokeColor: "#1452ff",
                             strokeWeight: 5,
                             strokeOpacity: 0.8,
                           },
-                          suppressMarkers: false,
+                          suppressMarkers: true,
                         }}
                       />
                     )}
+                    {/* Render searched location */}
+                    {searchedLocation &&
+                      selectedCategory === "searchResult" && (
+                        <>
+                          {searchedLocation.address !== "none" &&
+                            !searchedLocation.isCustomActivity && (
+                              <Marker
+                                position={searchedLocation.position}
+                                onClick={() => {
+                                  setSelectedMarker({
+                                    id: 999, // Use a unique ID that won't conflict with activity IDs
+                                    title: searchedLocation.name,
+                                  });
+                                  setSelectedMarkerPosition(
+                                    searchedLocation.position
+                                  );
+                                }}
+                                icon={{
+                                  url: "/icons/location-black.svg",
+                                  scaledSize: new google.maps.Size(32, 32),
+                                }}
+                              />
+                            )}
+                          {selectedMarker &&
+                            selectedMarker.id === 999 &&
+                            selectedMarkerPosition && (
+                              <InfoWindow
+                                position={selectedMarkerPosition}
+                                onCloseClick={() => {
+                                  setSelectedMarker(null);
+                                  setSelectedMarkerPosition(null);
+                                }}
+                              >
+                                <div className="text-sm">
+                                  <p className="font-semibold">
+                                    {searchedLocation.name}
+                                  </p>
+                                  {searchedLocation.address !== "none" && (
+                                    <p className="text-gray-600">
+                                      {searchedLocation.address}
+                                    </p>
+                                  )}
+                                </div>
+                              </InfoWindow>
+                            )}
+                        </>
+                      )}
                   </GoogleMap>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
