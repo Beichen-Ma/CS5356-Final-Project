@@ -26,6 +26,7 @@ import {
   Bike,
   User,
   Bus,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -301,6 +302,13 @@ interface Activity {
   website?: string;
   phoneNumber?: string;
   locationPosition?: ActivityPosition;
+  image?: string;
+  editorialSummary?: string;
+  accessibility?: string[];
+  serviceOptions?: string[];
+  planningTips?: string[];
+  kidFriendly?: boolean;
+  openingHours?: string[];
 }
 
 interface TransitInfo {
@@ -457,6 +465,11 @@ export default function TripOverview() {
       category: placeType,
       placeId: searchedLocation.placeId,
       position: searchedLocation.position,
+      image: searchedLocation.image, // Add the image URL from searchedLocation
+      rating: searchedLocation.rating,
+      price: searchedLocation.priceLevel
+        ? "$".repeat(searchedLocation.priceLevel)
+        : undefined,
     };
 
     // Update the state with the new saved location
@@ -565,7 +578,7 @@ export default function TripOverview() {
     if (selectedCategory === category) {
       setSelectedCategory(""); // Toggle off if already selected
       setSearchQuery(""); // Clear search query
-      setIsAddingActivity(false);
+      // setIsAddingActivity(false);
     } else {
       setSelectedCategory(category);
       setSearchQuery(""); // Clear search query
@@ -631,6 +644,17 @@ export default function TripOverview() {
     isCustomActivity?: boolean;
     website?: string;
     phoneNumber?: string;
+    image?: string;
+    rating?: number;
+    reviewCount?: number;
+    priceLevel?: number;
+    description?: string;
+    editorialSummary?: string;
+    accessibility?: string[];
+    serviceOptions?: string[];
+    planningTips?: string[];
+    kidFriendly?: boolean;
+    openingHours?: string[];
   } | null>(null);
 
   // Add these new state variables for custom autocomplete
@@ -714,6 +738,13 @@ export default function TripOverview() {
           "types",
           "website",
           "formatted_phone_number",
+          "photos",
+          "rating",
+          "user_ratings_total",
+          "price_level",
+          "editorial_summary",
+          "opening_hours",
+          "business_status",
         ],
       },
       (place, status) => {
@@ -728,6 +759,71 @@ export default function TripOverview() {
             mapRef.current.setZoom(14);
           }
 
+          // Get the image URL if available
+          let photoUrl = "";
+          if (place.photos && place.photos.length > 0) {
+            photoUrl = place.photos[0].getUrl({
+              maxWidth: 500,
+              maxHeight: 300,
+            });
+          }
+
+          // Extract accessibility options
+          const accessibility: string[] = [];
+          if ((place as any).wheelchair_accessible_entrance)
+            accessibility.push("Wheelchair accessible entrance");
+
+          // Extract category-based information
+          const serviceOptions: string[] = [];
+          const planningTips: string[] = [];
+
+          // Determine place categories based on types
+          const types = place.types || [];
+          if (
+            types.includes("restaurant") ||
+            types.includes("cafe") ||
+            types.includes("bar")
+          ) {
+            // For restaurants/cafes/bars
+            serviceOptions.push("Food & drinks available");
+            planningTips.push("Consider calling for reservations");
+          }
+
+          if (
+            types.includes("museum") ||
+            types.includes("art_gallery") ||
+            types.includes("tourist_attraction")
+          ) {
+            // For attractions
+            planningTips.push("Check opening times before visiting");
+            planningTips.push("May have admission fees");
+          }
+
+          if (types.includes("lodging") || types.includes("hotel")) {
+            // For hotels
+            serviceOptions.push("Accommodation services");
+            planningTips.push("Advance booking recommended");
+          }
+
+          if (types.includes("shopping_mall") || types.includes("store")) {
+            // For shopping
+            serviceOptions.push("Shopping available");
+          }
+
+          // Infer kid-friendliness from types
+          const kidFriendly =
+            types.includes("amusement_park") ||
+            types.includes("zoo") ||
+            types.includes("aquarium") ||
+            types.includes("museum") ||
+            types.includes("park");
+
+          // Get opening hours if available
+          let openingHours: string[] = [];
+          if (place.opening_hours && place.opening_hours.weekday_text) {
+            openingHours = place.opening_hours.weekday_text;
+          }
+
           // Store location details for display
           setSearchedLocation({
             position: {
@@ -740,6 +836,19 @@ export default function TripOverview() {
             placeTypes: place.types || [],
             website: place.website || "",
             phoneNumber: place.formatted_phone_number || "",
+            image: photoUrl,
+            rating: place.rating,
+            reviewCount: place.user_ratings_total,
+            priceLevel: place.price_level,
+            editorialSummary: (place as any).editorial_summary
+              ? (place as any).editorial_summary.overview
+              : undefined,
+            accessibility: accessibility.length > 0 ? accessibility : undefined,
+            serviceOptions:
+              serviceOptions.length > 0 ? serviceOptions : undefined,
+            planningTips: planningTips.length > 0 ? planningTips : undefined,
+            kidFriendly: (place as any).good_for_children || false,
+            openingHours: openingHours.length > 0 ? openingHours : undefined,
           });
 
           // Initialize the activity name with the location name
@@ -820,6 +929,13 @@ export default function TripOverview() {
       placeTypes: [activity.category.toLowerCase()],
       website: activity.website || "",
       phoneNumber: activity.phoneNumber || "",
+      image: activity.image || "", // Preserve the image URL when editing
+      editorialSummary: activity.editorialSummary || "",
+      accessibility: activity.accessibility || [],
+      serviceOptions: activity.serviceOptions || [],
+      planningTips: activity.planningTips || [],
+      kidFriendly: activity.kidFriendly || false,
+      openingHours: activity.openingHours || [],
     });
 
     // Set the edit mode
@@ -865,6 +981,8 @@ export default function TripOverview() {
       // Store website and phone number if available
       website: searchedLocation?.website || "",
       phoneNumber: searchedLocation?.phoneNumber || "",
+      // Store the image URL if available
+      image: searchedLocation?.image || "",
     };
 
     // Create a copy of the current trip
@@ -1016,7 +1134,8 @@ export default function TripOverview() {
         e.target instanceof Element &&
         (e.target.closest('[role="button"]') ||
           e.target.closest(".grip-handle") ||
-          e.target.closest(".dropdown-area"))
+          e.target.closest(".dropdown-area") ||
+          e.target.closest(".activity-image"))
       ) {
         return;
       }
@@ -1079,76 +1198,91 @@ export default function TripOverview() {
           isSelected
             ? "border-2 border-red-500"
             : "border border-gray-200 dark:border-gray-700"
-        }`}
+        } flex items-center overflow-hidden`}
       >
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center">
-              <div
-                {...attributes}
-                {...listeners}
-                className="absolute -left-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center cursor-grab active:cursor-grabbing grip-handle group"
-                data-tooltip="Drag to reorder"
-              >
-                <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <div className="absolute left-10 -top-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-nowrap">
-                  Drag to reorder
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 w-10 flex items-center justify-center cursor-grab active:cursor-grabbing grip-handle group bg-gray-50 dark:bg-gray-900"
+          data-tooltip="Drag to reorder"
+        >
+          <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <div className="absolute left-10 -top-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-nowrap">
+            Drag to reorder
+          </div>
+        </div>
+
+        {activity.image && (
+          <div className="activity-image flex-shrink-0 px-3 py-2">
+            <div className="w-20 h-20 overflow-hidden rounded-lg">
+              <img
+                src={activity.image}
+                alt={activity.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center">
+                <div>
+                  <CardTitle className="text-base text-left">
+                    {activity.title}
+                  </CardTitle>
+                  <CardDescription className="text-xs text-left">
+                    {activity.time}
+                  </CardDescription>
                 </div>
               </div>
-              <div className="ml-4">
-                <CardTitle className="text-base text-left">
-                  {activity.title}
-                </CardTitle>
-                <CardDescription className="text-xs text-left">
-                  {activity.time}
-                </CardDescription>
+              <div className="dropdown-area">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-500"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => handleEditActivity(activity)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit info
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleDeleteActivity(activity.id)}
+                      className="text-red-500 focus:bg-red-100 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400"
+                    >
+                      <Trash className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
-            <div className="dropdown-area">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-gray-500"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => handleEditActivity(activity)}
-                  >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit info
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleDeleteActivity(activity.id)}
-                    className="text-red-500 focus:bg-red-100 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400"
-                  >
-                    <Trash className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          </CardHeader>
+          <CardContent className="pb-2">
+            <p className="text-sm text-left">{activity.description}</p>
+          </CardContent>
+          <CardFooter className="pt-0">
+            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 text-left">
+              <MapPin className="mr-1 h-3 w-3" />
+              {activity.location}
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pb-2 pl-[2.5rem]">
-          <p className="text-sm text-left">{activity.description}</p>
-        </CardContent>
-        <CardFooter className="pl-[2.5rem] pt-0">
-          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 text-left">
-            <MapPin className="mr-1 h-3 w-3" />
-            {activity.location}
-          </div>
-          <Badge
-            variant="outline"
-            className={`ml-auto border-gray-200 dark:border-gray-700`}
-          >
-            {activity.category}
-          </Badge>
-        </CardFooter>
+            <Badge
+              variant="outline"
+              className={`ml-auto border-gray-200 dark:border-gray-700`}
+            >
+              {activity.category}
+            </Badge>
+          </CardFooter>
+        </div>
       </Card>
     );
   }
@@ -2464,6 +2598,45 @@ export default function TripOverview() {
                           Additional Information
                         </h3>
 
+                        {/* Place Image */}
+                        {searchedLocation?.image && (
+                          <div className="mb-3">
+                            <img
+                              src={searchedLocation.image || "/placeholder.svg"}
+                              alt={searchedLocation.name}
+                              className="w-full h-40 object-cover rounded-md"
+                            />
+                          </div>
+                        )}
+
+                        {/* Rating and Reviews */}
+                        {searchedLocation?.rating && (
+                          <div className="flex items-center gap-2 mb-3">
+                            <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                            <span className="text-sm font-medium">
+                              {searchedLocation.rating}
+                            </span>
+                            {searchedLocation?.reviewCount && (
+                              <span className="text-sm text-gray-500">
+                                ({searchedLocation.reviewCount} reviews)
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Place Type */}
+                        {/* <div className="flex items-center gap-2 mb-3">
+                          <MapPin className="h-5 w-5 text-gray-500" />
+                          <span className="text-sm">
+                            {getPlaceTypeName(searchedLocation?.placeTypes)}
+                          </span>
+                          {searchedLocation?.priceLevel && (
+                            <span className="text-sm ml-2">
+                              {"$".repeat(searchedLocation.priceLevel)}
+                            </span>
+                          )}
+                        </div> */}
+
                         {/* Website */}
                         <div className="flex items-center gap-2 mb-2">
                           <svg
@@ -2527,6 +2700,123 @@ export default function TripOverview() {
                             </span>
                           )}
                         </div>
+
+                        {/* Editorial Summary */}
+                        {searchedLocation?.editorialSummary && (
+                          <div className="mt-4 mb-3">
+                            <h4 className="text-sm font-semibold mb-2">
+                              About
+                            </h4>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              {searchedLocation.editorialSummary}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Opening Hours */}
+                        {searchedLocation?.openingHours &&
+                          searchedLocation.openingHours.length > 0 && (
+                            <div className="mt-4 mb-3">
+                              <h4 className="text-sm font-semibold mb-2">
+                                Opening Hours
+                              </h4>
+                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                {searchedLocation.openingHours.map(
+                                  (hours, index) => (
+                                    <li
+                                      key={index}
+                                      className="flex items-start"
+                                    >
+                                      <span className="mr-2">•</span>
+                                      <span>{hours}</span>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {/* Accessibility */}
+                        {searchedLocation?.accessibility &&
+                          searchedLocation.accessibility.length > 0 && (
+                            <div className="mt-4 mb-3">
+                              <h4 className="text-sm font-semibold mb-2">
+                                Accessibility
+                              </h4>
+                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                {searchedLocation.accessibility.map(
+                                  (item, index) => (
+                                    <li
+                                      key={index}
+                                      className="flex items-start"
+                                    >
+                                      <span className="mr-2">•</span>
+                                      <span>{item}</span>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {/* Service Options */}
+                        {searchedLocation?.serviceOptions &&
+                          searchedLocation.serviceOptions.length > 0 && (
+                            <div className="mt-4 mb-3">
+                              <h4 className="text-sm font-semibold mb-2">
+                                Service Options
+                              </h4>
+                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                {searchedLocation.serviceOptions.map(
+                                  (item, index) => (
+                                    <li
+                                      key={index}
+                                      className="flex items-start"
+                                    >
+                                      <span className="mr-2">•</span>
+                                      <span>{item}</span>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {/* Planning Tips */}
+                        {searchedLocation?.planningTips &&
+                          searchedLocation.planningTips.length > 0 && (
+                            <div className="mt-4 mb-3">
+                              <h4 className="text-sm font-semibold mb-2">
+                                Planning
+                              </h4>
+                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                {searchedLocation.planningTips.map(
+                                  (item, index) => (
+                                    <li
+                                      key={index}
+                                      className="flex items-start"
+                                    >
+                                      <span className="mr-2">•</span>
+                                      <span>{item}</span>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {/* Kid Friendly */}
+                        {searchedLocation?.kidFriendly && (
+                          <div className="mt-4 mb-3">
+                            <h4 className="text-sm font-semibold mb-2">
+                              Family
+                            </h4>
+                            <div className="flex items-start text-sm text-gray-700 dark:text-gray-300">
+                              <span className="mr-2">•</span>
+                              <span>Good for children</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -2535,11 +2825,11 @@ export default function TripOverview() {
                         key={item.id}
                         className="overflow-hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
                       >
-                        <div className="flex">
+                        <div className="flex items-center">
                           <img
                             src={item.image || "/placeholder.svg"}
                             alt={item.title}
-                            className="h-[100px] w-[100px] object-cover"
+                            className="w-20 h-20 object-cover rounded-lg"
                           />
                           <div className="flex flex-1 flex-col p-4">
                             <div className="flex items-center justify-between">
