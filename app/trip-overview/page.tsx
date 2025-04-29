@@ -11,6 +11,7 @@ import {
   Plus,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Search,
   Utensils,
   Landmark,
@@ -65,6 +66,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -81,208 +88,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-
-// Sample trip data
-const tripsData = {
-  nyc: {
-    id: "nyc",
-    title: "NYC Trip",
-    startDate: "May 1, 2023",
-    endDate: "May 5, 2023",
-    location: "NYC",
-    collaborators: [
-      { id: "1", name: "Alex", color: "bg-green-500" },
-      { id: "2", name: "Sam", color: "bg-blue-500" },
-      { id: "3", name: "Taylor", color: "bg-purple-500" },
-      { id: "4", name: "Jordan", color: "bg-yellow-500" },
-      { id: "5", name: "Casey", color: "bg-pink-500" },
-      { id: "6", name: "Riley", color: "bg-indigo-500" },
-      { id: "7", name: "Morgan", color: "bg-red-500" },
-      { id: "8", name: "Jamie", color: "bg-orange-500" },
-      { id: "9", name: "Quinn", color: "bg-teal-500" },
-    ],
-    days: [
-      { id: "day1", date: "May 1", title: "Day 1", number: "1" },
-      { id: "day2", date: "May 2", title: "Day 2", number: "2" },
-      { id: "day3", date: "May 3", title: "Day 3", number: "3" },
-      { id: "day4", date: "May 4", title: "Day 4", number: "4" },
-      { id: "day5", date: "May 5", title: "Day 5", number: "5" },
-    ],
-    activities: {
-      day1: [
-        {
-          id: 1,
-          time: "09:00 AM",
-          title: "Breakfast at Coastal Cafe",
-          description:
-            "Start your day with a delicious breakfast at this local favorite.",
-          location: "123 Beach Drive",
-          category: "Food",
-        },
-        {
-          id: 2,
-          time: "11:00 AM",
-          title: "City Museum Tour",
-          description:
-            "Explore the city's rich history through interactive exhibits.",
-          location: "456 History Lane",
-          category: "Culture",
-        },
-        {
-          id: 3,
-          time: "02:00 PM",
-          title: "Lunch at Urban Bistro",
-          description:
-            "Enjoy a relaxing lunch with local cuisine and great views.",
-          location: "789 Downtown Ave",
-          category: "Food",
-        },
-      ],
-      day2: [
-        {
-          id: 6,
-          time: "10:00 AM",
-          title: "Hiking at National Park",
-          description:
-            "Enjoy a moderate hike with stunning views of the valley.",
-          location: "National Park Trail #5",
-          category: "Nature",
-        },
-      ],
-      day3: [],
-      day4: [],
-      day5: [],
-    },
-  },
-  cali: {
-    id: "cali",
-    title: "Cali Trip",
-    startDate: "June 15, 2023",
-    endDate: "June 21, 2023",
-    location: "California",
-    collaborators: [
-      { id: "2", name: "Sam", color: "bg-blue-500" },
-      { id: "3", name: "Taylor", color: "bg-purple-500" },
-      { id: "5", name: "Casey", color: "bg-pink-500" },
-      { id: "7", name: "Morgan", color: "bg-red-500" },
-    ],
-    days: [
-      { id: "day1", date: "June 15", title: "Day 1", number: "1" },
-      { id: "day2", date: "June 16", title: "Day 2", number: "2" },
-      { id: "day3", date: "June 17", title: "Day 3", number: "3" },
-      { id: "day4", date: "June 18", title: "Day 4", number: "4" },
-      { id: "day5", date: "June 19", title: "Day 5", number: "5" },
-      { id: "day6", date: "June 20", title: "Day 6", number: "6" },
-      { id: "day7", date: "June 21", title: "Day 7", number: "7" },
-    ],
-    activities: {
-      day1: [
-        {
-          id: 1,
-          time: "10:00 AM",
-          title: "Golden Gate Bridge Visit",
-          description: "Visit the iconic Golden Gate Bridge and take photos.",
-          location: "Golden Gate Bridge",
-          category: "Sightseeing",
-        },
-      ],
-      day2: [],
-      day3: [],
-      day4: [],
-      day5: [],
-      day6: [],
-      day7: [],
-    },
-  },
-  paris: {
-    id: "paris",
-    title: "Paris Trip",
-    startDate: "August 10, 2023",
-    endDate: "August 17, 2023",
-    location: "Paris",
-    collaborators: [
-      { id: "1", name: "Alex", color: "bg-green-500" },
-      { id: "4", name: "Jordan", color: "bg-yellow-500" },
-      { id: "5", name: "Casey", color: "bg-pink-500" },
-    ],
-    days: [
-      { id: "day1", date: "August 10", title: "Day 1", number: "1" },
-      { id: "day2", date: "August 11", title: "Day 2", number: "2" },
-      { id: "day3", date: "August 12", title: "Day 3", number: "3" },
-      { id: "day4", date: "August 13", title: "Day 4", number: "4" },
-      { id: "day5", date: "August 14", title: "Day 5", number: "5" },
-      { id: "day6", date: "August 15", title: "Day 6", number: "6" },
-      { id: "day7", date: "August 16", title: "Day 7", number: "7" },
-      { id: "day8", date: "August 17", title: "Day 8", number: "8" },
-    ],
-    activities: {
-      day1: [
-        {
-          id: 1,
-          time: "09:00 AM",
-          title: "Eiffel Tower Visit",
-          description: "Visit the iconic Eiffel Tower.",
-          location: "Eiffel Tower",
-          category: "Sightseeing",
-        },
-      ],
-      day2: [],
-      day3: [],
-      day4: [],
-      day5: [],
-      day6: [],
-      day7: [],
-      day8: [],
-    },
-  },
-  tokyo: {
-    id: "tokyo",
-    title: "Tokyo Trip",
-    startDate: "October 5, 2023",
-    endDate: "October 15, 2023",
-    location: "Tokyo",
-    collaborators: [
-      { id: "1", name: "Alex", color: "bg-green-500" },
-      { id: "3", name: "Taylor", color: "bg-purple-500" },
-      { id: "6", name: "Riley", color: "bg-indigo-500" },
-    ],
-    days: [
-      { id: "day1", date: "October 5", title: "Day 1", number: "1" },
-      { id: "day2", date: "October 6", title: "Day 2", number: "2" },
-      { id: "day3", date: "October 7", title: "Day 3", number: "3" },
-      { id: "day4", date: "October 8", title: "Day 4", number: "4" },
-      { id: "day5", date: "October 9", title: "Day 5", number: "5" },
-      { id: "day6", date: "October 10", title: "Day 6", number: "6" },
-      { id: "day7", date: "October 11", title: "Day 7", number: "7" },
-      { id: "day8", date: "October 12", title: "Day 8", number: "8" },
-      { id: "day9", date: "October 13", title: "Day 9", number: "9" },
-      { id: "day10", date: "October 14", title: "Day 10", number: "10" },
-      { id: "day11", date: "October 15", title: "Day 11", number: "11" },
-    ],
-    activities: {
-      day1: [
-        {
-          id: 1,
-          time: "10:00 AM",
-          title: "Tokyo Tower Visit",
-          description: "Visit the iconic Tokyo Tower.",
-          location: "Tokyo Tower",
-          category: "Sightseeing",
-        },
-      ],
-      day2: [],
-      day3: [],
-      day4: [],
-      day5: [],
-      day6: [],
-      day7: [],
-      day8: [],
-      day9: [],
-      day10: [],
-      day11: [],
-    },
-  },
-};
 
 // Update the activity interface to include position data
 // Add this near the top of the file where we define types
@@ -591,6 +396,9 @@ export default function TripOverview() {
     setIsAddingActivity(true);
     setSelectedCategory(""); // Clear selected category
     setSearchQuery(""); // Clear search query
+    setMiddlePanelCollapsed(false); // Expand the middle panel if it was collapsed
+    setEditMode(false); // Reset edit mode so category buttons will display
+    setEditingActivityId(null); // Clear any editing activity ID
 
     // Focus the search input after state updates
     setTimeout(() => {
@@ -912,6 +720,7 @@ export default function TripOverview() {
   const [editingActivityId, setEditingActivityId] = useState<number | null>(
     null
   );
+  const [middlePanelCollapsed, setMiddlePanelCollapsed] = useState(false);
 
   // Add these handler functions after the other handler functions
   const handleEditActivity = (activity: any) => {
@@ -942,6 +751,7 @@ export default function TripOverview() {
     setSelectedCategory("searchResult");
     setEditMode(true);
     setEditingLocation(false);
+    setMiddlePanelCollapsed(false); // Expand the middle panel if it was collapsed
 
     // Store the activity ID for updating
     setEditingActivityId(activity.id);
@@ -2183,695 +1993,751 @@ export default function TripOverview() {
 
           {/* Middle Panel - Category Content (Only shown when a category is selected) */}
           {showMiddlePanel && (
-            <div className="w-[580px] border-r border-gray-200 dark:border-gray-700 flex flex-col">
-              <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-                {/* Search Bar - Only show if adding activity or editing location */}
-                {(isAddingActivity || editingLocation) && (
-                  <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
-                    <div className="flex items-center p-2">
-                      <Search className="ml-2 h-5 w-5 text-gray-500" />
-                      <div className="flex-1 relative">
-                        <Input
-                          placeholder={getSearchPlaceholder()}
-                          className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
-                          value={searchQuery}
-                          onChange={handleSearchInputChange}
-                          onFocus={() =>
-                            searchQuery.length > 2 && setShowPredictions(true)
-                          }
-                          ref={searchInputRef}
-                        />
-
-                        {showPredictions && (
-                          <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
-                            <div
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
-                              onClick={() => handleSelectPrediction(null, true)}
-                            >
-                              <span>{searchQuery}</span>
-                              <span className="text-gray-500 text-sm">
-                                custom
-                              </span>
-                            </div>
-
-                            {predictions.map((prediction) => (
-                              <div
-                                key={prediction.place_id}
-                                className="p-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() =>
-                                  handleSelectPrediction(prediction)
-                                }
-                              >
-                                <div className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                                  <span>{prediction.description}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+            <div
+              className={`${
+                middlePanelCollapsed ? "w-[0px]" : "w-[580px]"
+              } border-r border-gray-200 dark:border-gray-700 flex flex-col relative transition-all duration-300 ease-in-out`}
+            >
+              <div className="absolute -right-4 top-1/2 transform -translate-y-1/2 z-10">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="icon"
-                        className="h-8 w-8 text-gray-500 ml-auto"
-                        onClick={() => {
-                          if (editingLocation) {
-                            setEditingLocation(false);
-                          } else {
-                            closeMiddlePanel();
-                          }
-                          setShowPredictions(false);
-                        }}
+                        className="h-8 w-8 rounded-full shadow-md bg-white dark:bg-gray-800"
+                        onClick={() =>
+                          setMiddlePanelCollapsed(!middlePanelCollapsed)
+                        }
                       >
-                        <X className="h-4 w-4" />
+                        {middlePanelCollapsed ? (
+                          <ChevronRight className="h-4 w-4" />
+                        ) : (
+                          <ChevronLeft className="h-4 w-4" />
+                        )}
                       </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Category Buttons - Only show if adding activity */}
-                {isAddingActivity && !editMode && (
-                  <div className="flex flex-wrap gap-1 mb-4">
-                    <Button
-                      variant={
-                        selectedCategory === "restaurants"
-                          ? "default"
-                          : "secondary"
-                      }
-                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
-                        selectedCategory === "restaurants"
-                          ? "text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                      onClick={() => handleCategorySelect("restaurants")}
-                    >
-                      <Utensils className="mr-2 h-4 w-4" />
-                      Restaurants
-                    </Button>
-                    <Button
-                      variant={
-                        selectedCategory === "hotels" ? "default" : "secondary"
-                      }
-                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
-                        selectedCategory === "hotels"
-                          ? "text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                      onClick={() => handleCategorySelect("hotels")}
-                    >
-                      <Hotel className="mr-2 h-4 w-4" />
-                      Hotels
-                    </Button>
-                    <Button
-                      variant={
-                        selectedCategory === "activities"
-                          ? "default"
-                          : "secondary"
-                      }
-                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
-                        selectedCategory === "activities"
-                          ? "text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                      onClick={() => handleCategorySelect("activities")}
-                    >
-                      <Landmark className="mr-2 h-4 w-4" />
-                      Things to do
-                    </Button>
-                    <Button
-                      variant={
-                        selectedCategory === "museums" ? "default" : "secondary"
-                      }
-                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
-                        selectedCategory === "museums"
-                          ? "text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                      onClick={() => handleCategorySelect("museums")}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="mr-2 h-4 w-4"
-                      >
-                        <path d="M2 20h20" />
-                        <path d="M5 4v16" />
-                        <path d="M19 4v16" />
-                        <path d="M5 4h14" />
-                        <path d="M5 12h14" />
-                      </svg>
-                      Museums
-                    </Button>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold capitalize">
-                      {isAddingActivity && !searchedLocation
-                        ? "Recent Searches"
-                        : selectedCategory === "searchResult"
-                        ? "Activity Details"
-                        : "Saved Results"}
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {isAddingActivity && !searchedLocation
-                        ? "Search for a location to add"
-                        : selectedCategory === "searchResult"
-                        ? "Edit details below to customize this activity"
-                        : `${
-                            getCurrentCategoryData().length
-                          } options available`}
-                    </p>
-                  </div>
-                  {selectedCategory === "searchResult" ? (
-                    <Button
-                      variant="ghost"
-                      className="text-sm font-medium"
-                      onClick={() => setEditMode(!editMode)}
-                    >
-                      {editMode ? "Done" : "Edit"}
-                    </Button>
-                  ) : isAddingActivity && !searchedLocation ? (
-                    // Don't show any buttons for Recent Searches
-                    <></>
-                  ) : (
-                    <div className="flex items-center gap-4">
-                      <Button
-                        variant="ghost"
-                        className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-black hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white"
-                      >
-                        Sort by
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="ml-1 h-4 w-4"
-                        >
-                          <path d="m6 9 6 6 6-6" />
-                        </svg>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:shadow-md transition-shadow dark:text-blue-400"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4"
-                        >
-                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                          <polyline points="16 6 12 2 8 6" />
-                          <line x1="12" y1="2" x2="12" y2="15" />
-                        </svg>
-                        Share
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="border-b border-gray-200 dark:border-gray-700">
-                {selectedCategory !== "searchResult" && !isAddingActivity && (
-                  <Tabs defaultValue="all">
-                    <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-700 bg-transparent p-0 overflow-x-auto">
-                      {getCategoryFilters().map((filter) => (
-                        <TabsTrigger
-                          key={filter.toLowerCase()}
-                          value={filter.toLowerCase()}
-                          className="rounded-none border-b-2 border-b-transparent px-4 py-2 data-[state=active]:border-b-black dark:data-[state=active]:border-b-white data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white"
-                        >
-                          {filter}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
-                )}
-              </div>
-              <ScrollArea className="flex-1">
-                <div className="grid gap-4 p-4">
-                  {isAddingActivity && !searchedLocation ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="mb-4 rounded-full bg-muted/50 p-3">
-                        <Search className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-                      </div>
-                      <h3 className="mb-1 text-lg font-medium">
-                        Search for a location
-                      </h3>
-                      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
-                        Type in the search bar above to find places to add to
-                        your itinerary
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>
+                        {middlePanelCollapsed ? "Expand" : "Collapse"} middle
+                        panel
                       </p>
-                    </div>
-                  ) : selectedCategory === "searchResult" &&
-                    searchedLocation ? (
-                    <div className="p-4">
-                      {editMode ? (
-                        <div className="mb-4">
-                          <label className="text-sm font-medium">
-                            Activity Name
-                          </label>
-                          <Input
-                            value={activityName}
-                            onChange={(e) => setActivityName(e.target.value)}
-                            placeholder="Enter activity name"
-                            className="mt-1"
-                          />
-                        </div>
-                      ) : (
-                        <h2 className="text-lg font-semibold mb-2">
-                          {activityName || searchedLocation.name}
-                        </h2>
-                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              {!middlePanelCollapsed && (
+                <>
+                  <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+                    {/* Search Bar - Only show if adding activity or editing location */}
+                    {(isAddingActivity || editingLocation) && (
+                      <div className="w-[550px] rounded-full bg-white shadow-lg mb-4">
+                        <div className="flex items-center p-2">
+                          <Search className="ml-2 h-5 w-5 text-gray-500" />
+                          <div className="flex-1 relative">
+                            <Input
+                              placeholder={getSearchPlaceholder()}
+                              className="border-0 bg-transparent pl-2 shadow-none focus-visible:ring-0 w-full focus:outline-none"
+                              value={searchQuery}
+                              onChange={handleSearchInputChange}
+                              onFocus={() =>
+                                searchQuery.length > 2 &&
+                                setShowPredictions(true)
+                              }
+                              ref={searchInputRef}
+                            />
 
-                      <div className="space-y-3 mb-4">
-                        {editMode ? (
-                          <div
-                            className={`flex items-center gap-2 p-2 border rounded-md ${
-                              editingLocation
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-                            } cursor-pointer transition-colors`}
-                            onClick={toggleLocationEditing}
-                          >
-                            <MapPin className="h-5 w-5 text-gray-500" />
-                            <div className="flex-1">
-                              <span className="text-sm">
-                                {searchedLocation.address !== "none"
-                                  ? searchedLocation.address
-                                  : "No location - click to set"}
-                              </span>
-                              {editingLocation && (
-                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                  Search above to change location
-                                </p>
-                              )}
-                            </div>
-                            {!editingLocation && (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4 text-gray-400"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M9 5l7 7-7 7"
-                                />
-                              </svg>
+                            {showPredictions && (
+                              <div className="absolute top-full left-0 w-full bg-white z-50 mt-1 rounded-md shadow-lg overflow-hidden">
+                                <div
+                                  className="p-2 hover:bg-gray-100 cursor-pointer border-b flex justify-between"
+                                  onClick={() =>
+                                    handleSelectPrediction(null, true)
+                                  }
+                                >
+                                  <span>{searchQuery}</span>
+                                  <span className="text-gray-500 text-sm">
+                                    custom
+                                  </span>
+                                </div>
+
+                                {predictions.map((prediction) => (
+                                  <div
+                                    key={prediction.place_id}
+                                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                                    onClick={() =>
+                                      handleSelectPrediction(prediction)
+                                    }
+                                  >
+                                    <div className="flex items-center">
+                                      <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                                      <span>{prediction.description}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-gray-500" />
-                            <span className="text-sm">
-                              {searchedLocation.address !== "none"
-                                ? searchedLocation.address
-                                : "No location specified"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {editMode ? (
-                        <div className="space-y-4 mb-6">
-                          <div>
-                            <label className="text-sm font-medium">Time</label>
-                            <Input
-                              value={activityTime}
-                              onChange={(e) => setActivityTime(e.target.value)}
-                              placeholder="Enter time (e.g. 9:00 AM)"
-                              className="mt-1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Notes</label>
-                            <Input
-                              value={activityDescription}
-                              onChange={(e) =>
-                                setActivityDescription(e.target.value)
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-500 ml-auto"
+                            onClick={() => {
+                              if (editingLocation) {
+                                setEditingLocation(false);
+                              } else {
+                                closeMiddlePanel();
                               }
-                              placeholder="Enter notes"
-                              className="mt-1"
-                            />
-                          </div>
+                              setShowPredictions(false);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Category Buttons - Only show if adding activity */}
+                    {isAddingActivity && !editMode && (
+                      <div className="flex flex-wrap gap-1 mb-4">
+                        <Button
+                          variant={
+                            selectedCategory === "restaurants"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                            selectedCategory === "restaurants"
+                              ? "text-blue-600"
+                              : "text-gray-700"
+                          }`}
+                          onClick={() => handleCategorySelect("restaurants")}
+                        >
+                          <Utensils className="mr-2 h-4 w-4" />
+                          Restaurants
+                        </Button>
+                        <Button
+                          variant={
+                            selectedCategory === "hotels"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                            selectedCategory === "hotels"
+                              ? "text-blue-600"
+                              : "text-gray-700"
+                          }`}
+                          onClick={() => handleCategorySelect("hotels")}
+                        >
+                          <Hotel className="mr-2 h-4 w-4" />
+                          Hotels
+                        </Button>
+                        <Button
+                          variant={
+                            selectedCategory === "activities"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                            selectedCategory === "activities"
+                              ? "text-blue-600"
+                              : "text-gray-700"
+                          }`}
+                          onClick={() => handleCategorySelect("activities")}
+                        >
+                          <Landmark className="mr-2 h-4 w-4" />
+                          Things to do
+                        </Button>
+                        <Button
+                          variant={
+                            selectedCategory === "museums"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                            selectedCategory === "museums"
+                              ? "text-blue-600"
+                              : "text-gray-700"
+                          }`}
+                          onClick={() => handleCategorySelect("museums")}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="mr-2 h-4 w-4"
+                          >
+                            <path d="M2 20h20" />
+                            <path d="M5 4v16" />
+                            <path d="M19 4v16" />
+                            <path d="M5 4h14" />
+                            <path d="M5 12h14" />
+                          </svg>
+                          Museums
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold capitalize">
+                          {isAddingActivity && !searchedLocation
+                            ? "Recent Searches"
+                            : selectedCategory === "searchResult"
+                            ? "Activity Details"
+                            : "Saved Results"}
+                        </h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {isAddingActivity && !searchedLocation
+                            ? "Search for a location to add"
+                            : selectedCategory === "searchResult"
+                            ? "Edit details below to customize this activity"
+                            : `${
+                                getCurrentCategoryData().length
+                              } options available`}
+                        </p>
+                      </div>
+                      {selectedCategory === "searchResult" ? (
+                        <Button
+                          variant="ghost"
+                          className="text-sm font-medium"
+                          onClick={() => setEditMode(!editMode)}
+                        >
+                          {editMode ? "Done" : "Edit"}
+                        </Button>
+                      ) : isAddingActivity && !searchedLocation ? (
+                        // Don't show any buttons for Recent Searches
+                        <></>
                       ) : (
-                        <div className="space-y-3 mb-6">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-5 w-5 text-gray-500" />
-                            <span className="text-sm">
-                              {activityTime || "No time specified"}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-2">
+                        <div className="flex items-center gap-4">
+                          <Button
+                            variant="ghost"
+                            className="flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-black hover:shadow-md transition-shadow dark:bg-gray-800 dark:text-white"
+                          >
+                            Sort by
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              width="20"
-                              height="20"
+                              width="16"
+                              height="16"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
                               strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              className="h-5 w-5 text-gray-500 mt-0.5"
+                              className="ml-1 h-4 w-4"
                             >
-                              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                              <path d="M13 2v7h7" />
+                              <path d="m6 9 6 6 6-6" />
                             </svg>
-                            <span className="text-sm">
-                              {activityDescription || "Custom notes"}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {!editMode && (
-                        <div className="flex gap-4 mb-6">
-                          <Button
-                            className="flex-1"
-                            onClick={handleAddToItinerary}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            {editingActivityId
-                              ? "Update Activity"
-                              : "Add to Itinerary"}
                           </Button>
                           <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={saveLocation}
+                            variant="ghost"
+                            className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:shadow-md transition-shadow dark:text-blue-400"
                           >
-                            <Heart className="mr-2 h-4 w-4" />
-                            Save{" "}
-                            {getPlaceTypeName(searchedLocation?.placeTypes)}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                              <polyline points="16 6 12 2 8 6" />
+                              <line x1="12" y1="2" x2="12" y2="15" />
+                            </svg>
+                            Share
                           </Button>
                         </div>
                       )}
-
-                      {/* Additional information section */}
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-4">
-                        <h3 className="text-sm font-semibold mb-3">
-                          Additional Information
-                        </h3>
-
-                        {/* Place Image */}
-                        {searchedLocation?.image && (
-                          <div className="mb-3">
-                            <img
-                              src={searchedLocation.image || "/placeholder.svg"}
-                              alt={searchedLocation.name}
-                              className="w-full h-40 object-cover rounded-md"
-                            />
+                    </div>
+                  </div>
+                  <div className="border-b border-gray-200 dark:border-gray-700">
+                    {selectedCategory !== "searchResult" &&
+                      !isAddingActivity && (
+                        <Tabs defaultValue="all">
+                          <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-700 bg-transparent p-0 overflow-x-auto">
+                            {getCategoryFilters().map((filter) => (
+                              <TabsTrigger
+                                key={filter.toLowerCase()}
+                                value={filter.toLowerCase()}
+                                className="rounded-none border-b-2 border-b-transparent px-4 py-2 data-[state=active]:border-b-black dark:data-[state=active]:border-b-white data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white"
+                              >
+                                {filter}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </Tabs>
+                      )}
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="grid gap-4 p-4">
+                      {isAddingActivity && !searchedLocation ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <div className="mb-4 rounded-full bg-muted/50 p-3">
+                            <Search className="h-6 w-6 text-gray-500 dark:text-gray-400" />
                           </div>
-                        )}
+                          <h3 className="mb-1 text-lg font-medium">
+                            Search for a location
+                          </h3>
+                          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                            Type in the search bar above to find places to add
+                            to your itinerary
+                          </p>
+                        </div>
+                      ) : selectedCategory === "searchResult" &&
+                        searchedLocation ? (
+                        <div className="p-4">
+                          {editMode ? (
+                            <div className="mb-4">
+                              <label className="text-sm font-medium">
+                                Activity Name
+                              </label>
+                              <Input
+                                value={activityName}
+                                onChange={(e) =>
+                                  setActivityName(e.target.value)
+                                }
+                                placeholder="Enter activity name"
+                                className="mt-1"
+                              />
+                            </div>
+                          ) : (
+                            <h2 className="text-lg font-semibold mb-2">
+                              {activityName || searchedLocation.name}
+                            </h2>
+                          )}
 
-                        {/* Rating and Reviews */}
-                        {searchedLocation?.rating && (
-                          <div className="flex items-center gap-2 mb-3">
-                            <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                            <span className="text-sm font-medium">
-                              {searchedLocation.rating}
-                            </span>
-                            {searchedLocation?.reviewCount && (
-                              <span className="text-sm text-gray-500">
-                                ({searchedLocation.reviewCount} reviews)
-                              </span>
+                          <div className="space-y-3 mb-4">
+                            {editMode ? (
+                              <div
+                                className={`flex items-center gap-2 p-2 border rounded-md ${
+                                  editingLocation
+                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                    : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                } cursor-pointer transition-colors`}
+                                onClick={toggleLocationEditing}
+                              >
+                                <MapPin className="h-5 w-5 text-gray-500" />
+                                <div className="flex-1">
+                                  <span className="text-sm">
+                                    {searchedLocation.address !== "none"
+                                      ? searchedLocation.address
+                                      : "No location - click to set"}
+                                  </span>
+                                  {editingLocation && (
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                      Search above to change location
+                                    </p>
+                                  )}
+                                </div>
+                                {!editingLocation && (
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4 text-gray-400"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M9 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-5 w-5 text-gray-500" />
+                                <span className="text-sm">
+                                  {searchedLocation.address !== "none"
+                                    ? searchedLocation.address
+                                    : "No location specified"}
+                                </span>
+                              </div>
                             )}
                           </div>
-                        )}
 
-                        {/* Place Type */}
-                        {/* <div className="flex items-center gap-2 mb-3">
-                          <MapPin className="h-5 w-5 text-gray-500" />
-                          <span className="text-sm">
-                            {getPlaceTypeName(searchedLocation?.placeTypes)}
-                          </span>
-                          {searchedLocation?.priceLevel && (
-                            <span className="text-sm ml-2">
-                              {"$".repeat(searchedLocation.priceLevel)}
-                            </span>
-                          )}
-                        </div> */}
-
-                        {/* Website */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-5 w-5 text-gray-500"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="2" y1="12" x2="22" y2="12" />
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                          </svg>
-                          {searchedLocation?.website ? (
-                            <a
-                              href={searchedLocation.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-[300px]"
-                            >
-                              {searchedLocation.website}
-                            </a>
-                          ) : (
-                            <span className="text-sm text-gray-500">
-                              No website available
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Phone Number */}
-                        <div className="flex items-center gap-2">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-5 w-5 text-gray-500"
-                          >
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                          </svg>
-                          {searchedLocation?.phoneNumber ? (
-                            <a
-                              href={`tel:${searchedLocation.phoneNumber}`}
-                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                            >
-                              {searchedLocation.phoneNumber}
-                            </a>
-                          ) : (
-                            <span className="text-sm text-gray-500">
-                              No phone number available
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Editorial Summary */}
-                        {searchedLocation?.editorialSummary && (
-                          <div className="mt-4 mb-3">
-                            <h4 className="text-sm font-semibold mb-2">
-                              About
-                            </h4>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                              {searchedLocation.editorialSummary}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Opening Hours */}
-                        {searchedLocation?.openingHours &&
-                          searchedLocation.openingHours.length > 0 && (
-                            <div className="mt-4 mb-3">
-                              <h4 className="text-sm font-semibold mb-2">
-                                Opening Hours
-                              </h4>
-                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
-                                {searchedLocation.openingHours.map(
-                                  (hours, index) => (
-                                    <li
-                                      key={index}
-                                      className="flex items-start"
-                                    >
-                                      <span className="mr-2">•</span>
-                                      <span>{hours}</span>
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            </div>
-                          )}
-
-                        {/* Accessibility */}
-                        {searchedLocation?.accessibility &&
-                          searchedLocation.accessibility.length > 0 && (
-                            <div className="mt-4 mb-3">
-                              <h4 className="text-sm font-semibold mb-2">
-                                Accessibility
-                              </h4>
-                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
-                                {searchedLocation.accessibility.map(
-                                  (item, index) => (
-                                    <li
-                                      key={index}
-                                      className="flex items-start"
-                                    >
-                                      <span className="mr-2">•</span>
-                                      <span>{item}</span>
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            </div>
-                          )}
-
-                        {/* Service Options */}
-                        {searchedLocation?.serviceOptions &&
-                          searchedLocation.serviceOptions.length > 0 && (
-                            <div className="mt-4 mb-3">
-                              <h4 className="text-sm font-semibold mb-2">
-                                Service Options
-                              </h4>
-                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
-                                {searchedLocation.serviceOptions.map(
-                                  (item, index) => (
-                                    <li
-                                      key={index}
-                                      className="flex items-start"
-                                    >
-                                      <span className="mr-2">•</span>
-                                      <span>{item}</span>
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            </div>
-                          )}
-
-                        {/* Planning Tips */}
-                        {searchedLocation?.planningTips &&
-                          searchedLocation.planningTips.length > 0 && (
-                            <div className="mt-4 mb-3">
-                              <h4 className="text-sm font-semibold mb-2">
-                                Planning
-                              </h4>
-                              <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
-                                {searchedLocation.planningTips.map(
-                                  (item, index) => (
-                                    <li
-                                      key={index}
-                                      className="flex items-start"
-                                    >
-                                      <span className="mr-2">•</span>
-                                      <span>{item}</span>
-                                    </li>
-                                  )
-                                )}
-                              </ul>
-                            </div>
-                          )}
-
-                        {/* Kid Friendly */}
-                        {searchedLocation?.kidFriendly && (
-                          <div className="mt-4 mb-3">
-                            <h4 className="text-sm font-semibold mb-2">
-                              Family
-                            </h4>
-                            <div className="flex items-start text-sm text-gray-700 dark:text-gray-300">
-                              <span className="mr-2">•</span>
-                              <span>Good for children</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    getCurrentCategoryData().map((item) => (
-                      <Card
-                        key={item.id}
-                        className="overflow-hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
-                      >
-                        <div className="flex items-center">
-                          <img
-                            src={item.image || "/placeholder.svg"}
-                            alt={item.title}
-                            className="w-20 h-20 object-cover rounded-lg"
-                          />
-                          <div className="flex flex-1 flex-col p-4">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-semibold">{item.title}</h4>
-                              <Badge
-                                variant="outline"
-                                className="border-gray-200 dark:border-gray-700"
-                              >
-                                {item.category}
-                              </Badge>
-                            </div>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                              {item.description}
-                            </p>
-                            <div className="mt-auto flex items-center justify-between">
-                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                                <MapPin className="mr-1 h-3 w-3" />
-                                {item.location}
+                          {editMode ? (
+                            <div className="space-y-4 mb-6">
+                              <div>
+                                <label className="text-sm font-medium">
+                                  Time
+                                </label>
+                                <Input
+                                  value={activityTime}
+                                  onChange={(e) =>
+                                    setActivityTime(e.target.value)
+                                  }
+                                  placeholder="Enter time (e.g. 9:00 AM)"
+                                  className="mt-1"
+                                />
                               </div>
-                              <div className="flex items-center">
-                                <span className="text-xs font-medium mr-2">
-                                  ★ {item.rating}
+                              <div>
+                                <label className="text-sm font-medium">
+                                  Notes
+                                </label>
+                                <Input
+                                  value={activityDescription}
+                                  onChange={(e) =>
+                                    setActivityDescription(e.target.value)
+                                  }
+                                  placeholder="Enter notes"
+                                  className="mt-1"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3 mb-6">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-gray-500" />
+                                <span className="text-sm">
+                                  {activityTime || "No time specified"}
                                 </span>
-                                <span className="text-xs font-medium">
-                                  {item.price}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 ml-2 text-black dark:text-white"
+                              </div>
+                              <div className="flex items-start gap-2">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-5 w-5 text-gray-500 mt-0.5"
                                 >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
+                                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                                  <path d="M13 2v7h7" />
+                                </svg>
+                                <span className="text-sm">
+                                  {activityDescription || "Custom notes"}
+                                </span>
                               </div>
                             </div>
+                          )}
+
+                          {!editMode && (
+                            <div className="flex gap-4 mb-6">
+                              <Button
+                                className="flex-1"
+                                onClick={handleAddToItinerary}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                {editingActivityId
+                                  ? "Update Activity"
+                                  : "Add to Itinerary"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={saveLocation}
+                              >
+                                <Heart className="mr-2 h-4 w-4" />
+                                Save{" "}
+                                {getPlaceTypeName(searchedLocation?.placeTypes)}
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Additional information section */}
+                          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-4">
+                            <h3 className="text-sm font-semibold mb-3">
+                              Additional Information
+                            </h3>
+
+                            {/* Place Image */}
+                            {searchedLocation?.image && (
+                              <div className="mb-3">
+                                <img
+                                  src={
+                                    searchedLocation.image || "/placeholder.svg"
+                                  }
+                                  alt={searchedLocation.name}
+                                  className="w-full h-40 object-cover rounded-md"
+                                />
+                              </div>
+                            )}
+
+                            {/* Rating and Reviews */}
+                            {searchedLocation?.rating && (
+                              <div className="flex items-center gap-2 mb-3">
+                                <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                                <span className="text-sm font-medium">
+                                  {searchedLocation.rating}
+                                </span>
+                                {searchedLocation?.reviewCount && (
+                                  <span className="text-sm text-gray-500">
+                                    ({searchedLocation.reviewCount} reviews)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Place Type */}
+                            {/* <div className="flex items-center gap-2 mb-3">
+                              <MapPin className="h-5 w-5 text-gray-500" />
+                              <span className="text-sm">
+                                {getPlaceTypeName(searchedLocation?.placeTypes)}
+                              </span>
+                              {searchedLocation?.priceLevel && (
+                                <span className="text-sm ml-2">
+                                  {"$".repeat(searchedLocation.priceLevel)}
+                                </span>
+                              )}
+                            </div> */}
+
+                            {/* Website */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-5 w-5 text-gray-500"
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="2" y1="12" x2="22" y2="12" />
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                              </svg>
+                              {searchedLocation?.website ? (
+                                <a
+                                  href={searchedLocation.website}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate max-w-[300px]"
+                                >
+                                  {searchedLocation.website}
+                                </a>
+                              ) : (
+                                <span className="text-sm text-gray-500">
+                                  No website available
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Phone Number */}
+                            <div className="flex items-center gap-2">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-5 w-5 text-gray-500"
+                              >
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                              </svg>
+                              {searchedLocation?.phoneNumber ? (
+                                <a
+                                  href={`tel:${searchedLocation.phoneNumber}`}
+                                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                  {searchedLocation.phoneNumber}
+                                </a>
+                              ) : (
+                                <span className="text-sm text-gray-500">
+                                  No phone number available
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Editorial Summary */}
+                            {searchedLocation?.editorialSummary && (
+                              <div className="mt-4 mb-3">
+                                <h4 className="text-sm font-semibold mb-2">
+                                  About
+                                </h4>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
+                                  {searchedLocation.editorialSummary}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Opening Hours */}
+                            {searchedLocation?.openingHours &&
+                              searchedLocation.openingHours.length > 0 && (
+                                <div className="mt-4 mb-3">
+                                  <h4 className="text-sm font-semibold mb-2">
+                                    Opening Hours
+                                  </h4>
+                                  <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                    {searchedLocation.openingHours.map(
+                                      (hours, index) => (
+                                        <li
+                                          key={index}
+                                          className="flex items-start"
+                                        >
+                                          <span className="mr-2">•</span>
+                                          <span>{hours}</span>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+
+                            {/* Accessibility */}
+                            {searchedLocation?.accessibility &&
+                              searchedLocation.accessibility.length > 0 && (
+                                <div className="mt-4 mb-3">
+                                  <h4 className="text-sm font-semibold mb-2">
+                                    Accessibility
+                                  </h4>
+                                  <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                    {searchedLocation.accessibility.map(
+                                      (item, index) => (
+                                        <li
+                                          key={index}
+                                          className="flex items-start"
+                                        >
+                                          <span className="mr-2">•</span>
+                                          <span>{item}</span>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+
+                            {/* Service Options */}
+                            {searchedLocation?.serviceOptions &&
+                              searchedLocation.serviceOptions.length > 0 && (
+                                <div className="mt-4 mb-3">
+                                  <h4 className="text-sm font-semibold mb-2">
+                                    Service Options
+                                  </h4>
+                                  <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                    {searchedLocation.serviceOptions.map(
+                                      (item, index) => (
+                                        <li
+                                          key={index}
+                                          className="flex items-start"
+                                        >
+                                          <span className="mr-2">•</span>
+                                          <span>{item}</span>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+
+                            {/* Planning Tips */}
+                            {searchedLocation?.planningTips &&
+                              searchedLocation.planningTips.length > 0 && (
+                                <div className="mt-4 mb-3">
+                                  <h4 className="text-sm font-semibold mb-2">
+                                    Planning
+                                  </h4>
+                                  <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                                    {searchedLocation.planningTips.map(
+                                      (item, index) => (
+                                        <li
+                                          key={index}
+                                          className="flex items-start"
+                                        >
+                                          <span className="mr-2">•</span>
+                                          <span>{item}</span>
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+
+                            {/* Kid Friendly */}
+                            {searchedLocation?.kidFriendly && (
+                              <div className="mt-4 mb-3">
+                                <h4 className="text-sm font-semibold mb-2">
+                                  Family
+                                </h4>
+                                <div className="flex items-start text-sm text-gray-700 dark:text-gray-300">
+                                  <span className="mr-2">•</span>
+                                  <span>Good for children</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
+                      ) : (
+                        getCurrentCategoryData().map((item) => (
+                          <Card
+                            key={item.id}
+                            className="overflow-hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-black"
+                          >
+                            <div className="flex items-center">
+                              <img
+                                src={item.image || "/placeholder.svg"}
+                                alt={item.title}
+                                className="w-20 h-20 object-cover rounded-lg"
+                              />
+                              <div className="flex flex-1 flex-col p-4">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="font-semibold">
+                                    {item.title}
+                                  </h4>
+                                  <Badge
+                                    variant="outline"
+                                    className="border-gray-200 dark:border-gray-700"
+                                  >
+                                    {item.category}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                                  {item.description}
+                                </p>
+                                <div className="mt-auto flex items-center justify-between">
+                                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                                    <MapPin className="mr-1 h-3 w-3" />
+                                    {item.location}
+                                  </div>
+                                  <div className="flex items-center">
+                                    <span className="text-xs font-medium mr-2">
+                                      ★ {item.rating}
+                                    </span>
+                                    <span className="text-xs font-medium">
+                                      {item.price}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 ml-2 text-black dark:text-white"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </>
+              )}
             </div>
           )}
 
