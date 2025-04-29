@@ -951,10 +951,47 @@ export default function TripOverview() {
   // Add a state to track whether marker was selected from map or activity list
   const [markerSelectedFromMap, setMarkerSelectedFromMap] = useState(false);
 
-  // Add this state variable with the other state variables
+  // Add state variable to remember selected activity
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(
     null
   );
+
+  // Add a clean useEffect for click outside handling
+  useEffect(() => {
+    // Only add the listener if an activity is selected
+    if (selectedActivityId === null) return;
+
+    // Handle click outside
+    const handleClickOutside = (event: MouseEvent) => {
+      // Skip if clicking on a card, dropdown, or handle
+      if (
+        event.target instanceof Element &&
+        (event.target.closest(".card-activity") ||
+          event.target.closest('[role="button"]') ||
+          event.target.closest(".grip-handle") ||
+          event.target.closest(".dropdown-area"))
+      ) {
+        return;
+      }
+
+      // Deselect the activity
+      setSelectedActivityId(null);
+
+      // Only clear marker if it wasn't selected from the map
+      if (!markerSelectedFromMap) {
+        setSelectedMarker(null);
+        setSelectedMarkerPosition(null);
+      }
+    };
+
+    // Add click listener
+    document.addEventListener("mousedown", handleClickOutside);
+
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [selectedActivityId, markerSelectedFromMap]);
 
   // Create a separate SortableActivityCard component to use with the sortable context
   function SortableActivityCard({
@@ -1038,7 +1075,7 @@ export default function TripOverview() {
         ref={setNodeRef}
         style={style}
         onClick={handleCardClick}
-        className={`relative bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer text-left ${
+        className={`card-activity relative bg-white dark:bg-black transition-shadow hover:shadow-md cursor-pointer text-left ${
           isSelected
             ? "border-2 border-red-500"
             : "border border-gray-200 dark:border-gray-700"
@@ -1087,6 +1124,7 @@ export default function TripOverview() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => handleDeleteActivity(activity.id)}
+                    className="text-red-500 focus:bg-red-100 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400"
                   >
                     <Trash className="mr-2 h-4 w-4" />
                     Delete
@@ -1106,11 +1144,7 @@ export default function TripOverview() {
           </div>
           <Badge
             variant="outline"
-            className={`ml-auto ${
-              isSelected
-                ? "border-red-500"
-                : "border-gray-200 dark:border-gray-700"
-            }`}
+            className={`ml-auto border-gray-200 dark:border-gray-700`}
           >
             {activity.category}
           </Badge>
@@ -1991,8 +2025,7 @@ export default function TripOverview() {
                           No activities yet
                         </h3>
                         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
-                          Start planning your day by adding activities from the
-                          map panel
+                          Start planning your day by clicking the button below
                         </p>
                       </div>
                     )}
@@ -2001,7 +2034,7 @@ export default function TripOverview() {
               </ScrollArea>
 
               {/* Fixed Add Activity Button */}
-              <div className="absolute bottom-5 left-0 right-0 p-4 bg-white dark:bg-black border-t border-gray-200 dark:border-gray-700 shadow-md z-10">
+              <div className="absolute bottom-2 left-0 right-0 p-4 bg-white dark:bg-black border-t border-gray-200 dark:border-gray-700 shadow-md z-10">
                 <Button
                   variant="outline"
                   className="w-full border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
@@ -2092,7 +2125,11 @@ export default function TripOverview() {
                           ? "default"
                           : "secondary"
                       }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                        selectedCategory === "restaurants"
+                          ? "text-blue-600"
+                          : "text-gray-700"
+                      }`}
                       onClick={() => handleCategorySelect("restaurants")}
                     >
                       <Utensils className="mr-2 h-4 w-4" />
@@ -2102,7 +2139,11 @@ export default function TripOverview() {
                       variant={
                         selectedCategory === "hotels" ? "default" : "secondary"
                       }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                        selectedCategory === "hotels"
+                          ? "text-blue-600"
+                          : "text-gray-700"
+                      }`}
                       onClick={() => handleCategorySelect("hotels")}
                     >
                       <Hotel className="mr-2 h-4 w-4" />
@@ -2114,7 +2155,11 @@ export default function TripOverview() {
                           ? "default"
                           : "secondary"
                       }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                        selectedCategory === "activities"
+                          ? "text-blue-600"
+                          : "text-gray-700"
+                      }`}
                       onClick={() => handleCategorySelect("activities")}
                     >
                       <Landmark className="mr-2 h-4 w-4" />
@@ -2124,7 +2169,11 @@ export default function TripOverview() {
                       variant={
                         selectedCategory === "museums" ? "default" : "secondary"
                       }
-                      className="rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100"
+                      className={`rounded-full bg-white px-4 shadow-md hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100 ${
+                        selectedCategory === "museums"
+                          ? "text-blue-600"
+                          : "text-gray-700"
+                      }`}
                       onClick={() => handleCategorySelect("museums")}
                     >
                       <svg
@@ -2156,7 +2205,7 @@ export default function TripOverview() {
                         ? "Recent Searches"
                         : selectedCategory === "searchResult"
                         ? "Activity Details"
-                        : "Results"}
+                        : "Saved Results"}
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {isAddingActivity && !searchedLocation
@@ -2568,6 +2617,17 @@ export default function TripOverview() {
                                 map.fitBounds(bounds);
                               }
                             }
+                          }
+                        }
+                      });
+
+                      // Add listener for map click to deselect activity
+                      map.addListener("click", () => {
+                        if (selectedActivityId !== null) {
+                          setSelectedActivityId(null);
+                          if (!markerSelectedFromMap) {
+                            setSelectedMarker(null);
+                            setSelectedMarkerPosition(null);
                           }
                         }
                       });
