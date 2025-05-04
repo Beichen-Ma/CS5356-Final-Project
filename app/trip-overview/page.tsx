@@ -184,18 +184,6 @@ export default function TripOverview() {
     if (currentTrip) {
       setTrip(currentTrip);
       setSelectedDay(currentTrip.days[0]?.id || "");
-      // const locationCoordinates: {
-      //   [key: string]: { lat: number; lng: number };
-      // } = {
-      //   NYC: { lat: 40.7128, lng: -74.006 },
-      //   California: { lat: 36.7783, lng: -119.4179 },
-      //   Paris: { lat: 48.8566, lng: 2.3522 },
-      //   Tokyo: { lat: 35.6762, lng: 139.6503 },
-      // };
-
-      // setMapCenter(
-      //   locationCoordinates[trip.location] || { lat: 40.7128, lng: -74.006 }
-      // );
     } else {
       router.push("/");
     }
@@ -1874,7 +1862,7 @@ export default function TripOverview() {
           {/* First Panel - Day Overview */}
           <div
             className={`${
-              selectedCategory ? "w-1/4" : "w-1/4"
+              selectedCategory ? "w-1/3" : "w-1/3"
             } border-r border-gray-200 dark:border-gray-700 flex flex-col `}
           >
             <div className="border-b border-gray-200 dark:border-gray-700 p-4">
