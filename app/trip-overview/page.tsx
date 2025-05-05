@@ -88,6 +88,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { ProtectedRoute } from "@/components/protected-route";
+import { AuthNav } from "@/components/auth-nav";
 
 // Update the activity interface to include position data
 // Add this near the top of the file where we define types
@@ -143,13 +145,15 @@ interface TransitInfo {
   selectedMode?: "walking" | "bicycling" | "driving" | "transit"; // Add this line
 }
 
-export default function TripOverview() {
+function TripOverviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tripId = searchParams.get("id") || "nyc";
   const { getTrip } = useTrips();
 
-  const [selectedDay, setSelectedDay] = useState("day1");
+  const [selectedDay, setSelectedDay] = useState<string | "overview">(
+    "overview"
+  );
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1695,11 +1699,25 @@ export default function TripOverview() {
     }
   };
 
+  // Handle day selection
+  const handleDaySelect = (dayId: string | "overview") => {
+    setSelectedDay(dayId);
+    if (dayId !== "overview") {
+      // Reset other states when selecting a specific day
+      setSelectedMarker(null);
+      setSelectedMarkerPosition(null);
+      setMarkerSelectedFromMap(false);
+      setSelectedActivityId(null);
+    }
+  };
+
   if (!trip) return null;
 
   // Get the activities for the selected day
   const dayActivities =
-    trip.activities[selectedDay as keyof typeof trip.activities] || [];
+    selectedDay !== "overview"
+      ? trip.activities[selectedDay as keyof typeof trip.activities] || []
+      : Object.values(trip.activities).flat();
 
   // Function to toggle location editing mode
   const toggleLocationEditing = () => {
@@ -1761,7 +1779,9 @@ export default function TripOverview() {
               </Button>
             </Link>
             <div className="text-xl font-bold text-black dark:text-white">
-              <span className="flex items-center gap-2">{trip.title}</span>
+              <span className="flex items-center gap-2">
+                {trip.title} • {trip.location}
+              </span>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {trip.startDate} - {trip.endDate}
               </p>
@@ -1825,6 +1845,34 @@ export default function TripOverview() {
           </div>
           <ScrollArea className="flex-1">
             <div className="flex flex-col gap-1 p-2">
+              {/* Overview Button */}
+              <Button
+                variant={selectedDay === "overview" ? "default" : "ghost"}
+                className={`flex flex-col items-center justify-center h-16 ${
+                  isCollapsed ? "p-1" : "p-2"
+                }`}
+                onClick={() => handleDaySelect("overview")}
+              >
+                {!isCollapsed && <span className="text-xs">Trip</span>}
+                <span
+                  className={`font-medium ${
+                    isCollapsed ? "text-xs" : "text-sm"
+                  }`}
+                >
+                  {isCollapsed ? (
+                    <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                      {trip.days.length}
+                    </span>
+                  ) : (
+                    "Overview"
+                  )}
+                </span>
+              </Button>
+
+              {/* Separator Line */}
+              <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
+
+              {/* Day Buttons */}
               {trip.days.map((day) => (
                 <Button
                   key={day.id}
@@ -1832,7 +1880,7 @@ export default function TripOverview() {
                   className={`flex flex-col items-center justify-center h-16 ${
                     isCollapsed ? "p-1" : "p-2"
                   }`}
-                  onClick={() => setSelectedDay(day.id)}
+                  onClick={() => handleDaySelect(day.id)}
                 >
                   {!isCollapsed && <span className="text-xs">{day.date}</span>}
                   <span
@@ -1866,102 +1914,187 @@ export default function TripOverview() {
             } border-r border-gray-200 dark:border-gray-700 flex flex-col `}
           >
             <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-              <h2 className="text-xl font-bold">Trip Overview</h2>
+              {selectedDay === "overview" ? (
+                <h2 className="text-xl font-bold">Trip Overview</h2>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">
+                    {trip.days.find((day) => day.id === selectedDay)?.title} -{" "}
+                    {trip.days.find((day) => day.id === selectedDay)?.date}
+                  </h2>
+
+                  {isLoaded && dayActivities.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1"
+                      onClick={toggleDirections}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M12 19V5" />
+                        <path d="M5 12h14" />
+                        <path d="m12 5-3 3 3-3 3 3-3-3z" />
+                        <path d="m12 19 3-3-3 3-3-3 3 3z" />
+                      </svg>
+                      {showDirections ? "Hide Route" : "Show Route"}
+                    </Button>
+                  )}
+                </div>
+              )}
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {trip.days.find((day) => day.id === selectedDay)?.date}, 2023 •{" "}
-                {trip.location}
+                {trip.startDate} - {trip.endDate} • {trip.location}
               </p>
             </div>
             <div className="flex flex-col h-[calc(100%-66px)] relative">
               <ScrollArea className="flex-1">
                 <div className="p-4 pb-20">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">
-                      {trip.days.find((day) => day.id === selectedDay)?.title} -{" "}
-                      {trip.days.find((day) => day.id === selectedDay)?.date}
-                    </h3>
-                    {isLoaded && dayActivities.length > 1 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-1"
-                        onClick={toggleDirections}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4"
-                        >
-                          <path d="M12 19V5" />
-                          <path d="M5 12h14" />
-                          <path d="m12 5-3 3 3-3 3 3-3-3z" />
-                          <path d="m12 19 3-3-3 3-3-3 3 3z" />
-                        </svg>
-                        {showDirections ? "Hide Route" : "Show Route"}
-                      </Button>
-                    )}
-                  </div>
-                  <div className="space-y-4 ">
-                    {dayActivities.length > 0 ? (
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                      >
-                        <SortableContext
-                          items={dayActivities.map(
-                            (activity: any) => activity.id
-                          )}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          {dayActivities.map((activity: any, index: number) => (
-                            <div key={activity.id}>
-                              <SortableActivityCard
-                                activity={activity}
-                                index={index}
-                              />
-                              {/* Add transit info row after each activity except the last one */}
-                              {index < dayActivities.length - 1 &&
-                                // Only show transit info if neither the origin nor destination is a custom activity
-                                (activity.location !== "none" &&
-                                dayActivities[index + 1].location !== "none" ? (
-                                  <TransitRow
-                                    originActivity={activity}
-                                    destinationActivity={
-                                      dayActivities[index + 1]
-                                    }
-                                  />
-                                ) : (
-                                  // Show a simplified divider for custom activities
-                                  <div className="flex items-center justify-center py-2 mx-2 my-1">
-                                    <div className="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
-                                  </div>
-                                ))}
-                            </div>
-                          ))}
-                        </SortableContext>
-                      </DndContext>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <div className="mb-4 rounded-full bg-muted/50 p-3">
-                          <Calendar className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                  {selectedDay === "overview" ? (
+                    // Overview Panel Content - Show all days
+                    <div className="space-y-6">
+                      {trip.days.map((day) => (
+                        <div key={day.id} className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold">
+                              {day.title} - {day.date}
+                            </h3>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDaySelect(day.id)}
+                              className="text-xs"
+                            >
+                              View Details
+                            </Button>
+                          </div>
+
+                          {/* Day Activities Preview */}
+                          <div className="space-y-2">
+                            {trip.activities[day.id]?.length > 0 ? (
+                              trip.activities[day.id]
+                                .slice(0, 2)
+                                .map((activity: any) => (
+                                  <Card
+                                    key={activity.id}
+                                    className="border border-gray-200 dark:border-gray-700"
+                                  >
+                                    <CardContent className="p-3">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="font-medium">
+                                            {activity.title}
+                                          </p>
+                                          <p className="text-xs text-gray-500">
+                                            {activity.time}
+                                          </p>
+                                        </div>
+                                        <Badge
+                                          variant="outline"
+                                          className="border-gray-200 dark:border-gray-700"
+                                        >
+                                          {activity.category}
+                                        </Badge>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))
+                            ) : (
+                              <div className="text-center p-3 text-gray-500 dark:text-gray-400 text-sm border border-dashed border-gray-200 dark:border-gray-700 rounded">
+                                No activities planned yet
+                              </div>
+                            )}
+
+                            {/* Show "more activities" message if more than 2 */}
+                            {(trip.activities[day.id]?.length || 0) > 2 && (
+                              <div className="text-center p-1">
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={() => handleDaySelect(day.id)}
+                                  className="text-xs"
+                                >
+                                  +{(trip.activities[day.id]?.length || 0) - 2}{" "}
+                                  more activities
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <h3 className="mb-1 text-lg font-medium">
-                          No activities yet
-                        </h3>
-                        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
-                          Start planning your day by clicking the button below
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // Specific Day Content
+                    <div className="space-y-4">
+                      {/* Remove the Show/Hide Route button duplicated here */}
+
+                      {/* Rest of existing specific day content with DndContext */}
+                      {dayActivities.length > 0 ? (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={dayActivities.map(
+                              (activity: any) => activity.id
+                            )}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {dayActivities.map(
+                              (activity: any, index: number) => (
+                                <div key={activity.id}>
+                                  <SortableActivityCard
+                                    activity={activity}
+                                    index={index}
+                                  />
+                                  {/* Add transit info row after each activity except the last one */}
+                                  {index < dayActivities.length - 1 &&
+                                    // Only show transit info if neither the origin nor destination is a custom activity
+                                    (activity.location !== "none" &&
+                                    dayActivities[index + 1].location !==
+                                      "none" ? (
+                                      <TransitRow
+                                        originActivity={activity}
+                                        destinationActivity={
+                                          dayActivities[index + 1]
+                                        }
+                                      />
+                                    ) : (
+                                      // Show a simplified divider for custom activities
+                                      <div className="flex items-center justify-center py-2 mx-2 my-1">
+                                        <div className="h-px w-full bg-gray-200 dark:bg-gray-700"></div>
+                                      </div>
+                                    ))}
+                                </div>
+                              )
+                            )}
+                          </SortableContext>
+                        </DndContext>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <div className="mb-4 rounded-full bg-muted/50 p-3">
+                            <Calendar className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                          </div>
+                          <h3 className="mb-1 text-lg font-medium">
+                            No activities yet
+                          </h3>
+                          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+                            Start planning your day by clicking the button below
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
 
@@ -1971,9 +2104,12 @@ export default function TripOverview() {
                   variant="outline"
                   className="w-full border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
                   onClick={handleAddActivity}
+                  disabled={selectedDay === "overview"}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Activity
+                  {selectedDay === "overview"
+                    ? "Select a day to add activity"
+                    : "Add Activity"}
                 </Button>
               </div>
             </div>
@@ -2979,5 +3115,13 @@ export default function TripOverview() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TripOverview() {
+  return (
+    <ProtectedRoute>
+      <TripOverviewContent />
+    </ProtectedRoute>
   );
 }

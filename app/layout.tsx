@@ -1,28 +1,30 @@
-import type React from "react";
+import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
 import { TripProvider } from "@/context/trip-context";
+import SessionProvider from "@/components/session-provider";
+import { ToastProvider } from "@/components/ui/use-toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Trip Planner",
-  description: "Plan your trips with ease",
+  title: "Travel Trip Planner",
+  description: "Plan your dream vacation",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <TripProvider>{children}</TripProvider>
-        </ThemeProvider>
+        <SessionProvider>
+          <ToastProvider>
+            <TripProvider>{children}</TripProvider>
+          </ToastProvider>
+        </SessionProvider>
       </body>
     </html>
   );

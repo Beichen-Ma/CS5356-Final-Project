@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { v4 as uuidv4 } from "uuid";
 import type { DateRange } from "react-day-picker";
 import { Image, Upload } from "lucide-react";
@@ -33,11 +33,16 @@ import { useTrips, type Collaborator, type Trip } from "@/context/trip-context";
 interface NewTripModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  tripToEdit?: string; // Optional ID of trip to edit
 }
 
-export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
+export function NewTripModal({
+  open,
+  onOpenChange,
+  tripToEdit,
+}: NewTripModalProps) {
   const router = useRouter();
-  const { addTrip } = useTrips();
+  const { addTrip, getTrip, updateTrip } = useTrips();
   const [tripName, setTripName] = React.useState("");
   const [location, setLocation] = React.useState("");
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
@@ -53,6 +58,58 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
   const [datesConfirmed, setDatesConfirmed] = React.useState(false);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Load trip data if in edit mode
+  React.useEffect(() => {
+    if (open && tripToEdit) {
+      const trip = getTrip(tripToEdit);
+      if (trip) {
+        setTripName(trip.title);
+        setLocation(trip.location);
+        setCoverImage(trip.image || "/placeholder.svg?height=80&width=80");
+
+        // Determine if dates are flexible
+        if (trip.startDate === "Flexible") {
+          setIsFlexible(true);
+          // Extract the number of days from the endDate (e.g., "7 days")
+          const days = parseInt(trip.endDate.split(" ")[0]);
+          setNumberOfDays(isNaN(days) ? 1 : days);
+        } else {
+          setIsFlexible(false);
+          try {
+            // Parse the dates
+            const from = parse(trip.startDate, "MMMM d, yyyy", new Date());
+            const to = parse(trip.endDate, "MMMM d, yyyy", new Date());
+            setDateRange({ from, to });
+          } catch (error) {
+            console.error("Failed to parse dates:", error);
+          }
+        }
+
+        // Set collaborators, excluding the first one (assumed to be the creator)
+        setSelectedCollaborators(trip.collaborators.slice(1));
+        setDatesConfirmed(true);
+      }
+    }
+  }, [open, tripToEdit, getTrip]);
+
+  // Reset form when modal is closed
+  React.useEffect(() => {
+    if (!open && !tripToEdit) {
+      resetForm();
+    }
+  }, [open]);
+
+  const resetForm = () => {
+    setTripName("");
+    setLocation("");
+    setDateRange(undefined);
+    setSelectedCollaborators([]);
+    setCoverImage("/placeholder.svg?height=80&width=80");
+    setIsFlexible(false);
+    setNumberOfDays(1);
+    setDatesConfirmed(false);
+  };
 
   const handleCoverImageClick = () => {
     fileInputRef.current?.click();
@@ -76,7 +133,7 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
     setNumberOfDays(1);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!tripName || !location) {
@@ -89,92 +146,101 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
 
     setIsSubmitting(true);
 
-    // Generate a unique ID for the new trip
-    const tripId = uuidv4();
+    try {
+      let tripId = tripToEdit || uuidv4();
+      let startDate, endDate, daysArray;
 
-    let startDate, endDate, daysArray, days;
+      if (isFlexible) {
+        // Flexible mode: just use number of days
+        startDate = "Flexible";
+        endDate = `${numberOfDays} days`;
 
-    if (isFlexible) {
-      // Flexible mode: just use number of days
-      startDate = "Flexible";
-      endDate = `${numberOfDays} days`;
-      days = numberOfDays;
+        daysArray = Array.from({ length: numberOfDays }, (_, i) => {
+          return {
+            id: `day${i + 1}`,
+            date: `Day ${i + 1}`,
+            title: `Day ${i + 1}`,
+            number: `${i + 1}`,
+          };
+        });
+      } else {
+        // Fixed dates mode - we know dateRange.from and dateRange.to exist here
+        const fromDate = dateRange!.from!;
+        const toDate = dateRange!.to!;
 
-      daysArray = Array.from({ length: days }, (_, i) => {
-        return {
-          id: `day${i + 1}`,
-          date: `Day ${i + 1}`,
-          title: `Day ${i + 1}`,
-          number: `${i + 1}`,
+        startDate = format(fromDate, "MMMM d, yyyy");
+        endDate = format(toDate, "MMMM d, yyyy");
+
+        // Calculate number of days
+        const days =
+          Math.round(
+            (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
+          ) + 1;
+
+        // Create days array
+        daysArray = Array.from({ length: days }, (_, i) => {
+          const date = new Date(fromDate);
+          date.setDate(date.getDate() + i);
+          return {
+            id: `day${i + 1}`,
+            date: format(date, "MMM d"),
+            title: `Day ${i + 1}`,
+            number: `${i + 1}`,
+          };
+        });
+      }
+
+      if (tripToEdit) {
+        // Editing an existing trip
+        const existingTrip = getTrip(tripToEdit);
+        if (existingTrip) {
+          await updateTrip({
+            ...existingTrip,
+            title: tripName,
+            startDate,
+            endDate,
+            location,
+            image: coverImage,
+            // If we're editing, we'll preserve existing days and activities
+          });
+        }
+      } else {
+        // Creating a new trip
+        const newTrip: Trip = {
+          id: tripId,
+          title: tripName,
+          startDate,
+          endDate,
+          location,
+          collaborators: [
+            { id: "1", name: "Alex", color: "bg-green-500" }, // Current user
+            ...selectedCollaborators,
+          ],
+          days: daysArray,
+          activities: {},
+          image: coverImage,
         };
-      });
-    } else {
-      // Fixed dates mode - we know dateRange.from and dateRange.to exist here
-      const fromDate = dateRange!.from!;
-      const toDate = dateRange!.to!;
 
-      startDate = format(fromDate, "MMMM d, yyyy");
-      endDate = format(toDate, "MMMM d, yyyy");
+        await addTrip(newTrip);
+      }
 
-      // Calculate number of days
-      days =
-        Math.round(
-          (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
-        ) + 1;
+      // Reset form and close modal
+      resetForm();
+      onOpenChange(false);
 
-      // Create days array
-      daysArray = Array.from({ length: days }, (_, i) => {
-        const date = new Date(fromDate);
-        date.setDate(date.getDate() + i);
-        return {
-          id: `day${i + 1}`,
-          date: format(date, "MMM d"),
-          title: `Day ${i + 1}`,
-          number: `${i + 1}`,
-        };
-      });
+      // Navigate to the trip overview page if creating a new trip
+      if (!tripToEdit) {
+        router.push(`/trip-overview?id=${tripId}`);
+      }
+    } catch (error) {
+      console.error("Error creating/updating trip:", error);
+      // You could add error handling UI here
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Create activities object
-    const activities = daysArray.reduce((acc, day) => {
-      acc[day.id] = [];
-      return acc;
-    }, {} as Record<string, any>);
-
-    // Create new trip object
-    const newTrip: Trip = {
-      id: tripId,
-      title: tripName,
-      startDate,
-      endDate,
-      location,
-      collaborators: [
-        { id: "1", name: "Alex", color: "bg-green-500" }, // Current user
-        ...selectedCollaborators,
-      ],
-      days: daysArray,
-      activities,
-      image: coverImage,
-    };
-
-    // Add the new trip to the context
-    addTrip(newTrip);
-
-    // Reset form and close modal
-    setTripName("");
-    setLocation("");
-    setDateRange(undefined);
-    setSelectedCollaborators([]);
-    setCoverImage("/placeholder.svg?height=80&width=80");
-    setIsFlexible(false);
-    setNumberOfDays(1);
-    setDatesConfirmed(false);
-    setIsSubmitting(false);
-    onOpenChange(false);
-
-    // Navigate to the trip overview page
-    router.push(`/trip-overview?id=${tripId}`);
   };
+
+  const isEditMode = !!tripToEdit;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,11 +248,12 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="text-xl text-black dark:text-white">
-              Create New Trip
+              {isEditMode ? "Manage Trip" : "Create New Trip"}
             </DialogTitle>
             <DialogDescription>
-              Fill in the details below to create your new trip. Click create
-              when you're done.
+              {isEditMode
+                ? "Update your trip details below."
+                : "Fill in the details below to create your new trip. Click create when you're done."}
             </DialogDescription>
           </DialogHeader>
 
@@ -334,13 +401,15 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
                 </>
               )}
             </div>
-            <div className="grid gap-2">
-              <Label className="text-sm">Invite Collaborators</Label>
-              <CollaboratorSelector
-                selectedCollaborators={selectedCollaborators}
-                onCollaboratorsChange={setSelectedCollaborators}
-              />
-            </div>
+            {!isEditMode && (
+              <div className="grid gap-2">
+                <Label className="text-sm">Invite Collaborators</Label>
+                <CollaboratorSelector
+                  selectedCollaborators={selectedCollaborators}
+                  onCollaboratorsChange={setSelectedCollaborators}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -363,7 +432,13 @@ export function NewTripModal({ open, onOpenChange }: NewTripModalProps) {
               }
               className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
             >
-              {isSubmitting ? "Creating..." : "Create Trip"}
+              {isSubmitting
+                ? isEditMode
+                  ? "Updating..."
+                  : "Creating..."
+                : isEditMode
+                ? "Update Trip"
+                : "Create Trip"}
             </Button>
           </DialogFooter>
         </form>

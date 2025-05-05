@@ -1,0 +1,85 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  trips         Trip[]
+}
+
+model Trip {
+  id            String   @id @default(uuid())
+  title         String
+  startDate     String
+  endDate       String
+  location      String
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  days          Day[]
+  collaborators CollaboratorOnTrip[]
+}
+
+model Day {
+  id            String   @id @default(uuid())
+  date          String
+  title         String
+  number        String
+  tripId        String
+  
+  trip          Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  activities    Activity[]
+}
+
+model Activity {
+  id              Int      @id @default(autoincrement())
+  time            String?
+  title           String
+  description     String?
+  location        String?
+  category        String
+  position        String?  // JSON string for lat/lng
+  website         String?
+  phoneNumber     String?
+  image           String?
+  dayId           String
+  
+  day             Day      @relation(fields: [dayId], references: [id], onDelete: Cascade)
+}
+
+model Collaborator {
+  id            String   @id @default(uuid())
+  name          String
+  email         String?
+  color         String
+  
+  trips         CollaboratorOnTrip[]
+}
+
+model CollaboratorOnTrip {
+  collaboratorId String
+  tripId         String
+  
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  trip           Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  
+  @@id([collaboratorId, tripId])
+}
