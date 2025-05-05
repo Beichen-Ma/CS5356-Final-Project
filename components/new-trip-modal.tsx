@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 //   color: string;
 // };
 import { useTrips, type Collaborator, type Trip } from "@/context/trip-context";
+import { useAuth } from "@/context/auth-context";
 
 interface NewTripModalProps {
   open: boolean;
@@ -43,6 +44,7 @@ export function NewTripModal({
 }: NewTripModalProps) {
   const router = useRouter();
   const { addTrip, getTrip, updateTrip } = useTrips();
+  const { user } = useAuth();
   const [tripName, setTripName] = React.useState("");
   const [location, setLocation] = React.useState("");
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
@@ -205,6 +207,18 @@ export function NewTripModal({
           });
         }
       } else {
+        // Create a random color for the owner avatar
+        const colors = [
+          "bg-blue-500",
+          "bg-green-500",
+          "bg-purple-500",
+          "bg-yellow-500",
+          "bg-pink-500",
+          "bg-indigo-500",
+          "bg-red-500",
+        ];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
         // Creating a new trip
         const newTrip: Trip = {
           id: tripId,
@@ -213,7 +227,13 @@ export function NewTripModal({
           endDate,
           location,
           collaborators: [
-            { id: "1", name: "Alex", color: "bg-green-500" }, // Current user
+            // Use the current user's info as the owner
+            {
+              id: user?.id || "guest",
+              name: user?.name || "Guest",
+              color: randomColor,
+              email: user?.email || undefined,
+            },
             ...selectedCollaborators,
           ],
           days: daysArray,

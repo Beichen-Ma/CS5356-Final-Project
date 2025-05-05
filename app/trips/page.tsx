@@ -119,7 +119,7 @@ export default function TripsPage() {
           <div className="flex items-center">
             <div className="mr-10 text-xl font-bold text-black dark:text-white">
               <span className="flex items-center gap-2">
-                <img src="/logo.png" alt="Travel Planner" className="h-6 w-6" />
+                <img src="/logo.png" alt="Travel Planner" className="h-8 w-8" />
                 Travel Planner
               </span>
             </div>
@@ -130,19 +130,19 @@ export default function TripsPage() {
                 value="explore"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white data-[state=active]:shadow-none"
               >
-                Explore
+                {/* Explore */}
               </TabsTrigger>
               <TabsTrigger
                 value="trips"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white data-[state=active]:shadow-none"
               >
-                Trips
+                {/* Trips */}
               </TabsTrigger>
               <TabsTrigger
                 value="database"
                 className="data-[state=active]:bg-transparent data-[state=active]:text-black dark:data-[state=active]:text-white data-[state=active]:shadow-none"
               >
-                Database
+                {/* Database */}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -249,6 +249,25 @@ export default function TripsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Add information card for first-time users */}
+            <Card className="border-gray-200 bg-white dark:bg-black dark:border-gray-700">
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-lg font-medium text-black dark:text-white">
+                    Welcome to Travel Planner!
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Create your first trip by clicking the "New Trip" card.
+                  </p>
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 list-disc pl-5 mt-2 space-y-1">
+                    <li>Plan your itinerary by day</li>
+                    <li>Invite collaborators</li>
+                    <li>Track locations and activities</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -337,31 +356,46 @@ export default function TripsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditTrip(e, trip.id);
-                                }}
-                                className="cursor-pointer"
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Manage Trip Info
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTripToDelete(trip.id);
-                                }}
-                                className="cursor-pointer text-red-600 focus:text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete Trip
-                              </DropdownMenuItem>
+                              {!trip.isCollaborative ? (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditTrip(e, trip.id);
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Manage Trip Info
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTripToDelete(trip.id);
+                                    }}
+                                    className="cursor-pointer text-red-600 focus:text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Trip
+                                  </DropdownMenuItem>
+                                </>
+                              ) : (
+                                <DropdownMenuItem className="cursor-not-allowed opacity-50">
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  View Only
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                       </div>
+                      {trip.isCollaborative && trip.owner && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                          Shared by {trip.owner.name}
+                        </div>
+                      )}
                       {user &&
+                        !trip.isCollaborative &&
                         trip.collaborators.length > 0 &&
                         trip.collaborators[0].id === user.id && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 italic">

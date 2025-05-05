@@ -20,6 +20,7 @@ import {
   deleteActivity as deleteActivityAction,
   reorderActivities as reorderActivitiesAction,
 } from "@/app/actions/activity-actions";
+import { useAuth } from "@/context/auth-context";
 
 // Initial trip data (will be overwritten by data from server)
 const initialTripsData = {};
@@ -65,6 +66,11 @@ export type Trip = {
   days: Day[];
   activities: Record<string, Activity[]>;
   image?: string;
+  isCollaborative?: boolean;
+  owner?: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 export type TripsData = Record<string, Trip>;
@@ -91,9 +97,17 @@ export function TripProvider({ children }: { children: ReactNode }) {
   const [trips, setTrips] = useState<TripsData>(initialTripsData);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
 
-  // Fetch trips from the server on initial load
+  // Fetch trips from the server on initial load or when auth state changes
   useEffect(() => {
+    // Only fetch trips if the user is authenticated
+    if (!isAuthenticated) {
+      setTrips(initialTripsData);
+      setIsLoading(false);
+      return;
+    }
+
     async function loadTrips() {
       try {
         setIsLoading(true);
@@ -102,7 +116,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         const tripsData = await fetchTrips();
 
         // Convert array to record object with id as key
-        const tripsRecord = tripsData.reduce((acc, trip) => {
+        const tripsRecord = tripsData.reduce((acc: TripsData, trip: Trip) => {
           acc[trip.id] = trip;
           return acc;
         }, {} as TripsData);
@@ -117,7 +131,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
     }
 
     loadTrips();
-  }, []);
+  }, [isAuthenticated]);
 
   const addTrip = async (trip: Trip) => {
     try {

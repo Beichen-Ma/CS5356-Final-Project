@@ -28,6 +28,8 @@ import {
   User,
   Bus,
   Star,
+  Share2,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +51,7 @@ import {
   DialogContent,
   DialogTrigger,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   GoogleMap,
@@ -143,6 +146,152 @@ interface TransitInfo {
   };
   _timestamp?: number; // Store when the transit info was calculated
   selectedMode?: "walking" | "bicycling" | "driving" | "transit"; // Add this line
+}
+
+// Create a ShareTripDialog component
+function ShareTripDialog({
+  trip,
+  isOpen,
+  onClose,
+}: {
+  trip: any;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [emails, setEmails] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleAddEmail = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    if (emails.includes(email)) {
+      setError("This email is already added");
+      return;
+    }
+
+    setEmails([...emails, email]);
+    setEmail("");
+    setError("");
+  };
+
+  const handleRemoveEmail = (emailToRemove: string) => {
+    setEmails(emails.filter((e) => e !== emailToRemove));
+  };
+
+  const handleShare = () => {
+    if (emails.length === 0) {
+      setError("Please add at least one email address");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+
+    // Simulate API call
+    setTimeout(() => {
+      // In a real app, you would send these emails to your API
+      console.log(`Sharing trip ${trip.id} with:`, emails);
+      setSuccess(
+        `Trip "${trip.title}" shared with ${emails.length} ${
+          emails.length === 1 ? "person" : "people"
+        }`
+      );
+      setIsSubmitting(false);
+
+      // Reset and close after success message displayed
+      setTimeout(() => {
+        setEmails([]);
+        setSuccess("");
+        onClose();
+      }, 2000);
+    }, 1000);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && email) {
+      e.preventDefault();
+      handleAddEmail();
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogTitle className="flex items-center gap-2">
+          <Share2 className="h-5 w-5" />
+          Share Trip
+        </DialogTitle>
+        <div className="py-4">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium">{trip?.title}</h3>
+            <p className="text-sm text-gray-500">
+              Share this trip with friends and family
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Input
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError("");
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Enter email address"
+                className="flex-1"
+              />
+              <Button onClick={handleAddEmail} type="button">
+                Add
+              </Button>
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            {success && <p className="text-sm text-green-500">{success}</p>}
+
+            {emails.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {emails.map((email) => (
+                  <Badge
+                    key={email}
+                    variant="secondary"
+                    className="flex items-center gap-1 px-2 py-1"
+                  >
+                    <Mail className="h-3 w-3" />
+                    {email}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-4 w-4 p-0 hover:bg-transparent"
+                      onClick={() => handleRemoveEmail(email)}
+                    >
+                      <X className="h-3 w-3" />
+                      <span className="sr-only">Remove</span>
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleShare} disabled={isSubmitting}>
+            {isSubmitting ? "Sharing..." : "Share Trip"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function TripOverviewContent() {
@@ -1763,6 +1912,8 @@ function TripOverviewContent() {
     setEditingLocation(false);
   };
 
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
       {/* Navigation Bar */}
@@ -1892,7 +2043,7 @@ function TripOverviewContent() {
                   </span>
                 </Button>
               ))}
-              <Button
+              {/* <Button
                 variant="ghost"
                 className={`flex items-center justify-center h-16 ${
                   isCollapsed ? "p-1" : "p-2"
@@ -1900,7 +2051,7 @@ function TripOverviewContent() {
               >
                 <Plus className="h-5 w-5" />
                 {!isCollapsed && <span className="text-xs mt-1">Add Day</span>}
-              </Button>
+              </Button> */}
             </div>
           </ScrollArea>
         </div>
@@ -2362,23 +2513,9 @@ function TripOverviewContent() {
                           <Button
                             variant="ghost"
                             className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:shadow-md transition-shadow dark:text-blue-400"
+                            onClick={() => setIsShareModalOpen(true)}
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-4 w-4"
-                            >
-                              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                              <polyline points="16 6 12 2 8 6" />
-                              <line x1="12" y1="2" x2="12" y2="15" />
-                            </svg>
+                            <Share2 className="h-4 w-4" />
                             Share
                           </Button>
                         </div>
@@ -3114,6 +3251,13 @@ function TripOverviewContent() {
           </div>
         </div>
       </div>
+
+      {/* Share Trip Modal */}
+      <ShareTripDialog
+        trip={trip}
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+      />
     </div>
   );
 }

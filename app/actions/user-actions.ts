@@ -70,27 +70,27 @@ export async function getUserTrips(userId: string) {
     });
 
     // Transform the data structure to match the expected format in the client
-    return trips.map((trip) => ({
+    return trips.map((trip: any) => ({
       id: trip.id,
       title: trip.title,
       startDate: trip.startDate,
       endDate: trip.endDate,
       location: trip.location,
       image: trip.image || "/placeholder.svg?height=80&width=80",
-      collaborators: trip.collaborators.map((c) => ({
+      collaborators: trip.collaborators.map((c: any) => ({
         id: c.collaborator.id,
         name: c.collaborator.name,
         color: c.collaborator.color,
         email: c.collaborator.email || undefined,
       })),
-      days: trip.days.map((day) => ({
+      days: trip.days.map((day: any) => ({
         id: day.id,
         date: day.date,
         title: day.title,
         number: day.number,
       })),
-      activities: trip.days.reduce((acc, day) => {
-        acc[day.id] = day.activities.map((activity) => ({
+      activities: trip.days.reduce((acc: Record<string, any>, day: any) => {
+        acc[day.id] = day.activities.map((activity: any) => ({
           id: activity.id,
           time: activity.time || "",
           title: activity.title,

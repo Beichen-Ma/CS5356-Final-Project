@@ -20,6 +20,7 @@ export type TripFormData = {
     id: string;
     name: string;
     color: string;
+    email?: string;
   }[];
 };
 
@@ -35,7 +36,8 @@ export async function getTrips() {
 
     const userId = session.user.id;
 
-    const trips = await prisma.trip.findMany({
+    // Get trips where the user is the owner
+    const ownedTrips = await prisma.trip.findMany({
       where: { userId },
       include: {
         days: {
@@ -48,20 +50,64 @@ export async function getTrips() {
             collaborator: true,
           },
         },
+        user: true,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
+    // Get trips where the user is a collaborator
+    const collaborativeTrips = await prisma.trip.findMany({
+      where: {
+        collaborators: {
+          some: {
+            collaborator: {
+              email: session.user.email,
+            },
+          },
+        },
+        // Exclude trips the user owns (to avoid duplicates)
+        NOT: {
+          userId: userId,
+        },
+      },
+      include: {
+        days: {
+          include: {
+            activities: true,
+          },
+        },
+        collaborators: {
+          include: {
+            collaborator: true,
+          },
+        },
+        user: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Combine both sets of trips
+    const allTrips = [...ownedTrips, ...collaborativeTrips];
+
     // Transform the data structure to match the expected format in the client
-    return trips.map((trip: any) => ({
+    return allTrips.map((trip: any) => ({
       id: trip.id,
       title: trip.title,
       startDate: trip.startDate,
       endDate: trip.endDate,
       location: trip.location,
       image: trip.image || "/placeholder.svg?height=80&width=80",
+      isCollaborative: trip.userId !== userId,
+      owner: trip.user
+        ? {
+            id: trip.user.id,
+            name: trip.user.name,
+          }
+        : null,
       collaborators: trip.collaborators.map((c: any) => ({
         id: c.collaborator.id,
         name: c.collaborator.name,
@@ -112,7 +158,20 @@ export async function getTrip(id: string) {
     const trip = await prisma.trip.findFirst({
       where: {
         id,
-        userId, // Only fetch the trip if it belongs to the current user
+        OR: [
+          // Trip is owned by the user
+          { userId },
+          // User is a collaborator on the trip
+          {
+            collaborators: {
+              some: {
+                collaborator: {
+                  email: session.user.email,
+                },
+              },
+            },
+          },
+        ],
       },
       include: {
         days: {
@@ -125,6 +184,7 @@ export async function getTrip(id: string) {
             collaborator: true,
           },
         },
+        user: true,
       },
     });
 
@@ -140,6 +200,13 @@ export async function getTrip(id: string) {
       endDate: trip.endDate,
       location: trip.location,
       image: trip.image || "/placeholder.svg?height=80&width=80",
+      isCollaborative: trip.userId !== userId,
+      owner: trip.user
+        ? {
+            id: trip.user.id,
+            name: trip.user.name,
+          }
+        : null,
       collaborators: trip.collaborators.map((c: any) => ({
         id: c.collaborator.id,
         name: c.collaborator.name,
@@ -190,10 +257,17 @@ export async function createTrip(data: TripFormData) {
     // Store existing or create new collaborators
     const collaboratorIds = await Promise.all(
       data.collaborators.map(async (collaborator) => {
-        // Check if collaborator already exists
+        // Check if collaborator already exists by ID
         let existingCollaborator = await prisma.collaborator.findUnique({
           where: { id: collaborator.id },
         });
+
+        // If a collaborator has an email, also check by email
+        if (!existingCollaborator && collaborator.email) {
+          existingCollaborator = await prisma.collaborator.findFirst({
+            where: { email: collaborator.email },
+          });
+        }
 
         // If not, create a new one
         if (!existingCollaborator) {
@@ -202,6 +276,7 @@ export async function createTrip(data: TripFormData) {
               id: collaborator.id,
               name: collaborator.name,
               color: collaborator.color,
+              email: collaborator.email,
             },
           });
         }

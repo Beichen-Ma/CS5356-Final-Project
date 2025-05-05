@@ -22,7 +22,7 @@ export async function getActivities(dayId: string) {
       orderBy: { id: "asc" },
     });
 
-    return activities.map((activity) => ({
+    return activities.map((activity: any) => ({
       id: activity.id,
       time: activity.time || "",
       title: activity.title,

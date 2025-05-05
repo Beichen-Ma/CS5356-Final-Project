@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, X, PlusCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -21,6 +21,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useTrips, type Collaborator } from "@/context/trip-context";
+import { v4 as uuidv4 } from "uuid";
+import { Input } from "@/components/ui/input";
 
 interface CollaboratorSelectorProps {
   selectedCollaborators: Collaborator[];
@@ -90,6 +92,8 @@ export function CollaboratorSelector({
   onCollaboratorsChange,
 }: CollaboratorSelectorProps) {
   const [open, setOpen] = React.useState(false);
+  const [emailInput, setEmailInput] = React.useState("");
+  const [error, setError] = React.useState("");
 
   const handleSelect = (collaborator: Collaborator) => {
     if (selectedCollaborators.some((c) => c.id === collaborator.id)) {
@@ -105,6 +109,48 @@ export function CollaboratorSelector({
     onCollaboratorsChange(
       selectedCollaborators.filter((c) => c.id !== collaborator.id)
     );
+  };
+
+  const handleAddByEmail = () => {
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailInput)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    // Check if already added
+    if (selectedCollaborators.some((c) => c.email === emailInput)) {
+      setError("This email is already added");
+      return;
+    }
+
+    // Generate random color for the avatar
+    const colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-yellow-500",
+      "bg-pink-500",
+      "bg-indigo-500",
+      "bg-red-500",
+    ];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+    // Create a new collaborator with the email
+    const newCollaborator: Collaborator = {
+      id: uuidv4(),
+      name: emailInput.split("@")[0], // Use first part of email as name
+      email: emailInput,
+      color: randomColor,
+    };
+
+    // Add to selected collaborators
+    onCollaboratorsChange([...selectedCollaborators, newCollaborator]);
+
+    // Reset input and error
+    setEmailInput("");
+    setError("");
   };
 
   return (
@@ -166,6 +212,34 @@ export function CollaboratorSelector({
                 ))}
               </CommandGroup>
             </CommandList>
+            <div className="border-t border-gray-200 p-2 dark:border-gray-700">
+              <p className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                Or add by email
+              </p>
+              <div className="flex items-center gap-2 px-2 py-1">
+                <Input
+                  type="email"
+                  placeholder="collaborator@example.com"
+                  value={emailInput}
+                  onChange={(e) => {
+                    setEmailInput(e.target.value);
+                    setError("");
+                  }}
+                  className="h-8 text-sm"
+                />
+                <Button
+                  onClick={handleAddByEmail}
+                  size="sm"
+                  className="shrink-0"
+                >
+                  <PlusCircle className="mr-1 h-4 w-4" />
+                  Add
+                </Button>
+              </div>
+              {error && (
+                <p className="mt-1 px-2 text-xs text-red-500">{error}</p>
+              )}
+            </div>
           </Command>
         </PopoverContent>
       </Popover>
@@ -183,7 +257,7 @@ export function CollaboratorSelector({
                   {collaborator.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              {collaborator.name}
+              {collaborator.email || collaborator.name}
               <Button
                 variant="ghost"
                 size="sm"

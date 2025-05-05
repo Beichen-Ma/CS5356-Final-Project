@@ -170,8 +170,8 @@ export default function AuthPage() {
           <NextImage
             src="/logo.png"
             alt="Travel App Logo"
-            width={48}
-            height={48}
+            width={52}
+            height={52}
             className="mx-auto mb-6"
           />
           <h1 className="text-2xl font-bold mb-2">
