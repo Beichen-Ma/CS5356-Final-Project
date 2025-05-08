@@ -302,7 +302,7 @@ export async function createTrip(data: TripFormData) {
           })),
         },
         collaborators: {
-          create: collaboratorIds.map((id) => ({
+          create: collaboratorIds.map((id: string) => ({
             collaboratorId: id,
           })),
         },
