@@ -30,6 +30,7 @@ import {
   Star,
   Share2,
   Mail,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,7 @@ import {
   DialogTrigger,
   DialogTitle,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   GoogleMap,
@@ -62,6 +64,7 @@ import {
   DirectionsRenderer,
 } from "@react-google-maps/api";
 import { useTrips } from "@/context/trip-context";
+import { useAuth } from "@/context/auth-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -160,6 +163,7 @@ function ShareTripDialog({
 }) {
   const [email, setEmail] = useState("");
   const [emails, setEmails] = useState<string[]>([]);
+  const [permission, setPermission] = useState<"view" | "edit">("view");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -196,8 +200,12 @@ function ShareTripDialog({
 
     // Simulate API call
     setTimeout(() => {
-      // In a real app, you would send these emails to your API
-      console.log(`Sharing trip ${trip.id} with:`, emails);
+      // In a real app, you would send these emails to your API with the permission level
+      console.log(
+        `Sharing trip ${trip.id} with:`,
+        emails,
+        `Permission: ${permission}`
+      );
       setSuccess(
         `Trip "${trip.title}" shared with ${emails.length} ${
           emails.length === 1 ? "person" : "people"
@@ -223,62 +231,115 @@ function ShareTripDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogTitle className="flex items-center gap-2">
           <Share2 className="h-5 w-5" />
           Share Trip
         </DialogTitle>
         <div className="py-4">
           <div className="mb-4">
-            <h3 className="text-lg font-medium">{trip?.title}</h3>
+            <h3 className="text-lg font-medium">
+              Send the link for "{trip?.title}"
+            </h3>
             <p className="text-sm text-gray-500">
               Share this trip with friends and family
             </p>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Input
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Enter email address"
-                className="flex-1"
-              />
-              <Button onClick={handleAddEmail} type="button">
-                Add
-              </Button>
+          <div className="space-y-6">
+            <div>
+              <label className="text-sm font-medium">
+                Add people to send the link to
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Enter email address"
+                  className="flex-1"
+                />
+                <Button onClick={handleAddEmail} type="button">
+                  Add
+                </Button>
+              </div>
+
+              {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+              {success && (
+                <p className="mt-1 text-sm text-green-500">{success}</p>
+              )}
+
+              {emails.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {emails.map((email) => (
+                    <Badge
+                      key={email}
+                      variant="secondary"
+                      className="flex items-center gap-1 px-2 py-1"
+                    >
+                      <Mail className="h-3 w-3" />
+                      {email}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0 hover:bg-transparent"
+                        onClick={() => handleRemoveEmail(email)}
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Remove</span>
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            {success && <p className="text-sm text-green-500">{success}</p>}
-
-            {emails.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                {emails.map((email) => (
-                  <Badge
-                    key={email}
-                    variant="secondary"
-                    className="flex items-center gap-1 px-2 py-1"
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <h4 className="text-sm font-medium mb-2">General access</h4>
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white dark:bg-gray-700 rounded-full">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-gray-500"
+                      >
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="M9 10a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H9Z" />
+                        <path d="M8 3v4" />
+                        <path d="M16 3v4" />
+                        <path d="M3 11h18" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Restricted</p>
+                      <p className="text-xs text-gray-500">Only you can edit</p>
+                    </div>
+                  </div>
+                  <select
+                    className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-sm px-2 py-1"
+                    value={permission}
+                    onChange={(e) =>
+                      setPermission(e.target.value as "view" | "edit")
+                    }
                   >
-                    <Mail className="h-3 w-3" />
-                    {email}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-4 w-4 p-0 hover:bg-transparent"
-                      onClick={() => handleRemoveEmail(email)}
-                    >
-                      <X className="h-3 w-3" />
-                      <span className="sr-only">Remove</span>
-                    </Button>
-                  </Badge>
-                ))}
+                    <option value="view">View only</option>
+                    <option value="edit">Editor</option>
+                  </select>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -286,7 +347,69 @@ function ShareTripDialog({
             Cancel
           </Button>
           <Button onClick={handleShare} disabled={isSubmitting}>
-            {isSubmitting ? "Sharing..." : "Share Trip"}
+            {isSubmitting ? "Sharing..." : "Share"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Create a RequestEditAccessDialog component
+function RequestEditAccessDialog({
+  trip,
+  isOpen,
+  onClose,
+}: {
+  trip: any;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState("");
+
+  const handleRequestAccess = () => {
+    setIsSubmitting(true);
+
+    // Simulate API call
+    setTimeout(() => {
+      // In a real app, you would send a request to the trip owner
+      console.log(`Requesting edit access for trip ${trip.id}`);
+      setSuccess("Request sent to trip owner");
+      setIsSubmitting(false);
+
+      // Close after success message displayed
+      setTimeout(() => {
+        setSuccess("");
+        onClose();
+      }, 2000);
+    }, 1000);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogTitle className="flex items-center gap-2">
+          <Edit className="h-5 w-5" />
+          Request Edit Access
+        </DialogTitle>
+        <div className="py-4">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium">{trip?.title}</h3>
+            <p className="text-sm text-gray-500">
+              You currently have view-only access to this trip. Send a request
+              to the trip owner for edit permissions.
+            </p>
+          </div>
+
+          {success && <p className="text-sm text-green-500 mb-4">{success}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleRequestAccess} disabled={isSubmitting}>
+            {isSubmitting ? "Sending..." : "Send Request"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -298,7 +421,14 @@ function TripOverviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tripId = searchParams.get("id") || "nyc";
-  const { getTrip } = useTrips();
+  const {
+    getTrip,
+    updateActivity,
+    addActivity,
+    deleteActivity,
+    reorderActivities,
+  } = useTrips();
+  const { user } = useAuth();
 
   const [selectedDay, setSelectedDay] = useState<string | "overview">(
     "overview"
@@ -308,6 +438,7 @@ function TripOverviewContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [trip, setTrip] = useState(getTrip(tripId));
+  const [permission, setPermission] = useState<"view" | "edit">("view");
 
   // Add these new state variables for the map
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.006 }); // Default to NYC coordinates
@@ -320,7 +451,7 @@ function TripOverviewContent() {
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-    libraries: ["places"],
+    libraries: ["places", "geometry", "visualization", "drawing", "routes"],
   });
 
   // Add map reference
@@ -337,6 +468,16 @@ function TripOverviewContent() {
     if (currentTrip) {
       setTrip(currentTrip);
       setSelectedDay(currentTrip.days[0]?.id || "");
+
+      // Set permission based on trip ownership
+      if (!currentTrip.isCollaborative) {
+        // User is the owner
+        setPermission("edit");
+      } else {
+        // Set as view by default for shared trips
+        // In a real app, you'd check the permission level from the database
+        setPermission("view");
+      }
     } else {
       router.push("/");
     }
@@ -708,13 +849,47 @@ function TripOverviewContent() {
             mapRef.current.setZoom(14);
           }
 
+          // Extract place types first since they're used in multiple places
+          const types = place.types || [];
+
           // Get the image URL if available
           let photoUrl = "";
           if (place.photos && place.photos.length > 0) {
-            photoUrl = place.photos[0].getUrl({
-              maxWidth: 500,
-              maxHeight: 300,
-            });
+            try {
+              photoUrl = place.photos[0].getUrl({
+                maxWidth: 500,
+                maxHeight: 300,
+              });
+            } catch (err) {
+              console.error("Error getting photo URL:", err);
+              // For tourist attractions or landmarks without photos,
+              // set a generic image based on type
+              if (
+                types.includes("tourist_attraction") ||
+                types.includes("point_of_interest") ||
+                types.includes("establishment")
+              ) {
+                photoUrl = "/placeholder.svg"; // Use placeholder as fallback
+              }
+            }
+          } else {
+            // No photos available, set default image based on place type
+            if (
+              types.includes("restaurant") ||
+              types.includes("food") ||
+              types.includes("cafe")
+            ) {
+              photoUrl = "/placeholder.svg?type=restaurant";
+            } else if (
+              types.includes("tourist_attraction") ||
+              types.includes("point_of_interest")
+            ) {
+              photoUrl = "/placeholder.svg?type=attraction";
+            } else if (types.includes("lodging") || types.includes("hotel")) {
+              photoUrl = "/placeholder.svg?type=hotel";
+            } else {
+              photoUrl = "/placeholder.svg"; // Generic placeholder
+            }
           }
 
           // Extract accessibility options
@@ -727,7 +902,6 @@ function TripOverviewContent() {
           const planningTips: string[] = [];
 
           // Determine place categories based on types
-          const types = place.types || [];
           if (
             types.includes("restaurant") ||
             types.includes("cafe") ||
@@ -911,15 +1085,34 @@ function TripOverviewContent() {
 
     // Update the trip
     setTrip(updatedTrip);
+
+    // Check if the activity ID is likely a database ID or a temporary ID
+    // Database IDs are typically small sequential numbers (1, 2, 3, etc.)
+    // Temporary IDs created with Date.now() would be very large numbers
+    const isTemporaryId = activityId > 1000000000; // Date.now() is in milliseconds since 1970
+
+    // Only attempt to delete from database if it's not a temporary ID
+    if (!isTemporaryId) {
+      deleteActivity(activityId).catch((error) => {
+        console.error("Failed to delete activity:", error);
+      });
+    }
   };
 
   // Modify the handleAddToItinerary function to handle updates
   const handleAddToItinerary = () => {
     if (!trip || !selectedDay) return;
 
+    // Check if we're editing an existing activity or creating a new one
+    const isEditing = !!editingActivityId;
+    const isTemporaryId = editingActivityId && editingActivityId > 1000000000;
+
+    // For new activities, create a unique temporary ID
+    const tempId = isEditing ? editingActivityId : Date.now();
+
     // Create a new activity object
     const newActivity = {
-      id: editingActivityId || Date.now(), // Use existing ID if editing, or create new one
+      id: tempId, // Use existing ID if editing, or create new one
       time: activityTime || "",
       title: activityName || (searchedLocation ? searchedLocation.name : ""),
       description: activityDescription || "",
@@ -944,19 +1137,41 @@ function TripOverviewContent() {
       updatedTrip.activities[selectedDay] = [];
     }
 
-    if (editingActivityId) {
+    if (isEditing) {
       // Update existing activity
       updatedTrip.activities[selectedDay] = updatedTrip.activities[
         selectedDay
       ].map((activity: any) =>
         activity.id === editingActivityId ? newActivity : activity
       );
+
+      // Only save to database if it's not a temporary ID
+      if (!isTemporaryId) {
+        updateActivity(newActivity).catch((error) => {
+          console.error("Failed to update activity:", error);
+        });
+      }
     } else {
       // Add a new activity
       updatedTrip.activities[selectedDay] = [
         ...updatedTrip.activities[selectedDay],
         newActivity,
       ];
+
+      // Save to database immediately - it will get a proper ID from the database
+      addActivity(selectedDay, {
+        time: newActivity.time,
+        title: newActivity.title,
+        description: newActivity.description,
+        location: newActivity.location,
+        category: newActivity.category,
+        position: newActivity.position,
+        website: newActivity.website,
+        phoneNumber: newActivity.phoneNumber,
+        image: newActivity.image,
+      }).catch((error) => {
+        console.error("Failed to add activity:", error);
+      });
     }
 
     // Update the trip
@@ -1003,6 +1218,18 @@ function TripOverviewContent() {
 
     // Update the trip state
     setTrip(updatedTrip);
+
+    // Filter out temporary IDs before sending to the server
+    const permanentActivityIds = updatedTrip.activities[selectedDay]
+      .map((activity: any) => activity.id)
+      .filter((id: number) => id < 1000000000); // Only include database IDs
+
+    // Only save to database if there are permanent IDs to reorder
+    if (permanentActivityIds.length > 0) {
+      reorderActivities(selectedDay, permanentActivityIds).catch((error) => {
+        console.error("Failed to reorder activities:", error);
+      });
+    }
   };
 
   // Initialize sensors for drag and drop
@@ -1066,9 +1293,11 @@ function TripOverviewContent() {
   function SortableActivityCard({
     activity,
     index,
+    isViewOnly,
   }: {
     activity: any;
     index: number;
+    isViewOnly: boolean;
   }) {
     const { attributes, listeners, setNodeRef, transform, transition } =
       useSortable({ id: activity.id });
@@ -1152,10 +1381,13 @@ function TripOverviewContent() {
         } flex items-center overflow-hidden`}
       >
         <div
-          {...attributes}
-          {...listeners}
-          className="flex-shrink-0 w-10 flex items-center justify-center cursor-grab active:cursor-grabbing grip-handle group bg-gray-50 dark:bg-gray-900"
-          data-tooltip="Drag to reorder"
+          {...(isViewOnly ? {} : { ...attributes, ...listeners })}
+          className={`flex-shrink-0 w-10 flex items-center justify-center ${
+            isViewOnly
+              ? "cursor-not-allowed opacity-50"
+              : "cursor-grab active:cursor-grabbing"
+          } grip-handle group bg-gray-50 dark:bg-gray-900`}
+          data-tooltip={isViewOnly ? "Editing disabled" : "Drag to reorder"}
         >
           <GripVertical className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           <div className="absolute left-10 -top-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-50 whitespace-nowrap">
@@ -1200,19 +1432,31 @@ function TripOverviewContent() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => handleEditActivity(activity)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit info
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteActivity(activity.id)}
-                      className="text-red-500 focus:bg-red-100 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400"
-                    >
-                      <Trash className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
+                    {isViewOnly ? (
+                      <DropdownMenuItem
+                        disabled
+                        className="cursor-not-allowed opacity-50"
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View only mode
+                      </DropdownMenuItem>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleEditActivity(activity)}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit info
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteActivity(activity.id)}
+                          className="text-red-500 focus:bg-red-100 dark:focus:bg-red-900/50 focus:text-red-600 dark:focus:text-red-400"
+                        >
+                          <Trash className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -1238,7 +1482,7 @@ function TripOverviewContent() {
     );
   }
 
-  // Add state variables for transit info
+  // Add these new state variables with the other state variables
   const [transitInfo, setTransitInfo] = useState<{
     [key: string]: TransitInfo;
   }>({});
@@ -1252,7 +1496,7 @@ function TripOverviewContent() {
     destination: string,
     transitKey: string
   ) => {
-    if (!origin || !destination || origin === destination) return;
+    if (!origin || !destination || origin === destination || !isLoaded) return;
 
     // Set loading state for this specific transit calculation
     setIsLoadingTransit((prev) => ({ ...prev, [transitKey]: true }));
@@ -1274,20 +1518,32 @@ function TripOverviewContent() {
     }
 
     try {
-      // Use Google Maps Distance Matrix Service directly
-      const distanceMatrixService = new google.maps.DistanceMatrixService();
-
-      // Initialize the transit info object
+      // Initialize the transit info object with default values
       const newTransitInfo: TransitInfo = {
         origin,
         destination,
         driving: {
-          distance: "",
-          duration: "",
+          distance: "Calculating...",
+          duration: "Calculating...",
           durationValue: 0,
         },
         _timestamp: now,
+        selectedMode: "driving",
       };
+
+      // Update with default values first
+      setTransitInfo((prev) => ({ ...prev, [transitKey]: newTransitInfo }));
+
+      // Ensure the Google Maps API is fully loaded
+      if (!window.google || !window.google.maps) {
+        console.error("Google Maps API not loaded");
+        setIsLoadingTransit((prev) => ({ ...prev, [transitKey]: false }));
+        return;
+      }
+
+      // Create the service only when Google Maps is fully loaded
+      const distanceMatrixService =
+        new window.google.maps.DistanceMatrixService();
 
       // Function to get distance and duration for each mode
       const getModeData = async (mode: google.maps.TravelMode) => {
@@ -1318,25 +1574,32 @@ function TripOverviewContent() {
         }
       };
 
-      // Get data for each mode of transportation
+      // Get data for driving mode first
       const drivingData = await getModeData(google.maps.TravelMode.DRIVING);
-      if (drivingData) newTransitInfo.driving = drivingData;
-
-      const walkingData = await getModeData(google.maps.TravelMode.WALKING);
-      if (walkingData) newTransitInfo.walking = walkingData;
-
-      const bicyclingData = await getModeData(google.maps.TravelMode.BICYCLING);
-      if (bicyclingData) newTransitInfo.bicycling = bicyclingData;
-
-      const transitData = await getModeData(google.maps.TravelMode.TRANSIT);
-      if (transitData) newTransitInfo.transit = transitData;
-
-      // Set default selected mode if not already set
-      if (!newTransitInfo.selectedMode) {
-        newTransitInfo.selectedMode = "driving";
+      if (drivingData) {
+        newTransitInfo.driving = drivingData;
+        // Update immediately with driving data
+        setTransitInfo((prev) => ({
+          ...prev,
+          [transitKey]: { ...newTransitInfo, driving: drivingData },
+        }));
       }
 
-      setTransitInfo((prev) => ({ ...prev, [transitKey]: newTransitInfo }));
+      // Then get data for other modes in the background
+      Promise.all([
+        getModeData(google.maps.TravelMode.WALKING).then((data) => {
+          if (data) newTransitInfo.walking = data;
+        }),
+        getModeData(google.maps.TravelMode.BICYCLING).then((data) => {
+          if (data) newTransitInfo.bicycling = data;
+        }),
+        getModeData(google.maps.TravelMode.TRANSIT).then((data) => {
+          if (data) newTransitInfo.transit = data;
+        }),
+      ]).then(() => {
+        // Update with all transit data
+        setTransitInfo((prev) => ({ ...prev, [transitKey]: newTransitInfo }));
+      });
     } catch (error) {
       console.error("Error calculating transit time:", error);
     } finally {
@@ -1344,22 +1607,36 @@ function TripOverviewContent() {
     }
   };
 
-  // Add this effect to calculate transit times when activities change
+  // Replace the useEffect that automatically calculates transit times
   useEffect(() => {
-    if (!trip || !selectedDay) return;
-
-    const activities = trip.activities[selectedDay] || [];
-    if (activities.length <= 1) return;
-
-    // Calculate transit times between consecutive activities
-    for (let i = 0; i < activities.length - 1; i++) {
-      const origin = activities[i].location;
-      const destination = activities[i + 1].location;
-      const transitKey = `${activities[i].id}_${activities[i + 1].id}`;
-
-      calculateTransit(origin, destination, transitKey);
-    }
+    // Don't automatically calculate transit times
+    // We'll only calculate them when needed (on-demand)
   }, [trip, selectedDay]);
+
+  // Add this function to manually calculate transit for a specific row
+  const calculateTransitForRow = (
+    originActivity: any,
+    destinationActivity: any
+  ) => {
+    if (!originActivity || !destinationActivity) return;
+
+    // Skip if either is a custom activity
+    if (
+      originActivity.location === "none" ||
+      destinationActivity.location === "none" ||
+      !originActivity.location ||
+      !destinationActivity.location
+    ) {
+      return;
+    }
+
+    const transitKey = `${originActivity.id}_${destinationActivity.id}`;
+    calculateTransit(
+      originActivity.location,
+      destinationActivity.location,
+      transitKey
+    );
+  };
 
   // Add the TransitRow component
   function TransitRow({
@@ -1372,59 +1649,17 @@ function TripOverviewContent() {
     const transitKey = `${originActivity.id}_${destinationActivity.id}`;
     const info = transitInfo[transitKey];
     const isLoading = isLoadingTransit[transitKey];
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedMode, setSelectedMode] = useState<
       "walking" | "bicycling" | "driving" | "transit"
     >(info?.selectedMode || "driving");
 
-    // Initialize transit info if needed
+    // Initialize transit info when component loads
     useEffect(() => {
+      // Calculate transit info if we don't have it yet
       if (!info && !isLoading) {
-        // Check if either origin or destination is a custom activity (location="none")
-        if (
-          originActivity.location === "none" ||
-          destinationActivity.location === "none"
-        ) {
-          // Skip transit calculation for custom activities
-          return;
-        }
-
-        // If we don't have info yet and not loading, calculate it
-        calculateTransit(
-          originActivity.location,
-          destinationActivity.location,
-          transitKey
-        );
+        calculateTransitForRow(originActivity, destinationActivity);
       }
-    }, [
-      info,
-      isLoading,
-      originActivity.location,
-      destinationActivity.location,
-      transitKey,
-    ]);
-
-    // Update local selected mode when dialog opens
-    useEffect(() => {
-      if (isDialogOpen && info) {
-        setSelectedMode(info.selectedMode || "driving");
-      }
-    }, [isDialogOpen, info]);
-
-    // Handle confirming the selected transportation mode
-    const handleConfirm = () => {
-      if (info) {
-        // Update the transit info with the selected mode
-        setTransitInfo((prev) => ({
-          ...prev,
-          [transitKey]: {
-            ...prev[transitKey],
-            selectedMode: selectedMode,
-          },
-        }));
-      }
-      setIsDialogOpen(false);
-    };
+    }, [originActivity.id, destinationActivity.id]);
 
     // Get current mode data to display in the transit row
     const getCurrentModeData = () => {
@@ -1460,10 +1695,24 @@ function TripOverviewContent() {
 
     const modeData = getCurrentModeData();
 
+    // Handle confirming the selected transportation mode
+    const handleConfirm = () => {
+      if (info) {
+        // Update the transit info with the selected mode
+        setTransitInfo((prev) => ({
+          ...prev,
+          [transitKey]: {
+            ...prev[transitKey],
+            selectedMode: selectedMode,
+          },
+        }));
+      }
+    };
+
     return (
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog>
         <DialogTrigger asChild>
-          <div className="flex items-center justify-between px-6 py-2 mx-2 my-1  dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <div className="flex items-center justify-between px-6 py-2 mx-2 my-1 bg-gray-50 dark:bg-gray-900 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <div className="flex items-center">
               <div className="p-1.5 bg-blue-100 dark:bg-blue-900 rounded-full mr-3">
                 {isLoading ? (
@@ -1505,10 +1754,7 @@ function TripOverviewContent() {
         </DialogTrigger>
 
         <DialogContent className="sm:max-w-md">
-          <DialogTitle className="sr-only">
-            Transportation options from {originActivity.title} to{" "}
-            {destinationActivity.title}
-          </DialogTitle>
+          <DialogTitle>Transportation Options</DialogTitle>
           <div className="space-y-4 py-2">
             <div className="flex items-center justify-between text-sm px-2">
               <div>
@@ -1679,7 +1925,7 @@ function TripOverviewContent() {
                       </div>
                     ) : (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        计算中...
+                        Calculating...
                       </div>
                     )}
                   </div>
@@ -1751,9 +1997,11 @@ function TripOverviewContent() {
             </div>
 
             <div className="mt-6 flex justify-center">
-              <Button className="w-32" onClick={handleConfirm}>
-                Confirm
-              </Button>
+              <DialogClose asChild>
+                <Button className="w-32" onClick={handleConfirm}>
+                  Confirm
+                </Button>
+              </DialogClose>
             </div>
           </div>
         </DialogContent>
@@ -1913,6 +2161,8 @@ function TripOverviewContent() {
   };
 
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isRequestAccessModalOpen, setIsRequestAccessModalOpen] =
+    useState(false);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white">
@@ -1962,8 +2212,27 @@ function TripOverviewContent() {
             <Button
               variant="outline"
               className="border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
+              onClick={() => {
+                if (!trip.isCollaborative || permission === "edit") {
+                  setIsShareModalOpen(true);
+                  setIsRequestAccessModalOpen(false);
+                } else {
+                  setIsRequestAccessModalOpen(true);
+                  setIsShareModalOpen(false);
+                }
+              }}
             >
-              Share Trip
+              {!trip.isCollaborative || permission === "edit" ? (
+                <>
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Share Trip
+                </>
+              ) : (
+                <>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Request edit access
+                </>
+              )}
             </Button>
             <ThemeToggle />
           </div>
@@ -2191,7 +2460,11 @@ function TripOverviewContent() {
                       {/* Rest of existing specific day content with DndContext */}
                       {dayActivities.length > 0 ? (
                         <DndContext
-                          sensors={sensors}
+                          sensors={
+                            permission === "view" && !!trip?.isCollaborative
+                              ? []
+                              : sensors
+                          }
                           collisionDetection={closestCenter}
                           onDragEnd={handleDragEnd}
                         >
@@ -2207,6 +2480,10 @@ function TripOverviewContent() {
                                   <SortableActivityCard
                                     activity={activity}
                                     index={index}
+                                    isViewOnly={
+                                      permission === "view" &&
+                                      !!trip?.isCollaborative
+                                    }
                                   />
                                   {/* Add transit info row after each activity except the last one */}
                                   {index < dayActivities.length - 1 &&
@@ -2255,11 +2532,21 @@ function TripOverviewContent() {
                   variant="outline"
                   className="w-full border-gray-200 bg-transparent hover:bg-gray-100 hover:text-black dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-white"
                   onClick={handleAddActivity}
-                  disabled={selectedDay === "overview"}
+                  disabled={
+                    selectedDay === "overview" ||
+                    (permission === "view" && trip.isCollaborative)
+                  }
+                  title={
+                    permission === "view" && trip.isCollaborative
+                      ? "You need edit permissions to add activities"
+                      : ""
+                  }
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   {selectedDay === "overview"
                     ? "Select a day to add activity"
+                    : permission === "view" && trip.isCollaborative
+                    ? "View only mode"
                     : "Add Activity"}
                 </Button>
               </div>
@@ -2720,16 +3007,29 @@ function TripOverviewContent() {
                             </h3>
 
                             {/* Place Image */}
-                            {searchedLocation?.image && (
+                            {searchedLocation?.image ? (
                               <div className="mb-3">
                                 <img
-                                  src={
-                                    searchedLocation.image || "/placeholder.svg"
-                                  }
+                                  src={searchedLocation.image}
                                   alt={searchedLocation.name}
                                   className="w-full h-40 object-cover rounded-md"
+                                  onError={(e) => {
+                                    // If image fails to load, fallback to placeholder
+                                    e.currentTarget.src =
+                                      "/beautiful-location-map.png";
+                                  }}
                                 />
                               </div>
+                            ) : (
+                              searchedLocation && (
+                                <div className="mb-3">
+                                  <img
+                                    src="/placeholder.svg"
+                                    alt={searchedLocation.name || "Location"}
+                                    className="w-full h-40 object-cover rounded-md"
+                                  />
+                                </div>
+                              )
                             )}
 
                             {/* Rating and Reviews */}
@@ -3193,7 +3493,7 @@ function TripOverviewContent() {
                                   );
                                 }}
                                 icon={{
-                                  url: "/icons/location-black.svg",
+                                  url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
                                   scaledSize: new google.maps.Size(32, 32),
                                 }}
                               />
@@ -3253,11 +3553,22 @@ function TripOverviewContent() {
       </div>
 
       {/* Share Trip Modal */}
-      <ShareTripDialog
-        trip={trip}
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-      />
+      {(!trip.isCollaborative || permission === "edit") && (
+        <ShareTripDialog
+          trip={trip}
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+        />
+      )}
+
+      {/* Request Edit Access Modal */}
+      {trip.isCollaborative && permission === "view" && (
+        <RequestEditAccessDialog
+          trip={trip}
+          isOpen={isRequestAccessModalOpen}
+          onClose={() => setIsRequestAccessModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

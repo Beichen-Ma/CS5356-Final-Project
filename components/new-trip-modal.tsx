@@ -55,6 +55,7 @@ export function NewTripModal({
   const [coverImage, setCoverImage] = React.useState<string>(
     "/placeholder.svg?height=80&width=80"
   );
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [isFlexible, setIsFlexible] = React.useState(false);
   const [numberOfDays, setNumberOfDays] = React.useState<number>(1);
   const [datesConfirmed, setDatesConfirmed] = React.useState(false);
@@ -108,6 +109,7 @@ export function NewTripModal({
     setDateRange(undefined);
     setSelectedCollaborators([]);
     setCoverImage("/placeholder.svg?height=80&width=80");
+    setSelectedFile(null);
     setIsFlexible(false);
     setNumberOfDays(1);
     setDatesConfirmed(false);
@@ -120,6 +122,7 @@ export function NewTripModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const imageUrl = URL.createObjectURL(file);
       setCoverImage(imageUrl);
     }
@@ -133,6 +136,28 @@ export function NewTripModal({
     setDatesConfirmed(false);
     setDateRange(undefined);
     setNumberOfDays(1);
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload image");
+      }
+
+      const data = await response.json();
+      return data.filePath; // Return the file path from the server
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,6 +174,20 @@ export function NewTripModal({
     setIsSubmitting(true);
 
     try {
+      // Upload the image if a new one is selected
+      let imagePath = coverImage;
+      if (
+        selectedFile &&
+        coverImage !== "/placeholder.svg?height=80&width=80"
+      ) {
+        try {
+          imagePath = await uploadImage(selectedFile);
+        } catch (error) {
+          console.error("Failed to upload image:", error);
+          // Continue with the default image or previously saved image
+        }
+      }
+
       let tripId = tripToEdit || uuidv4();
       let startDate, endDate, daysArray;
 
@@ -202,7 +241,7 @@ export function NewTripModal({
             startDate,
             endDate,
             location,
-            image: coverImage,
+            image: imagePath,
             // If we're editing, we'll preserve existing days and activities
           });
         }
@@ -238,7 +277,7 @@ export function NewTripModal({
           ],
           days: daysArray,
           activities: {},
-          image: coverImage,
+          image: imagePath,
         };
 
         await addTrip(newTrip);
